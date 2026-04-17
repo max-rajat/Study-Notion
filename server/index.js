@@ -21,9 +21,10 @@ database.connect();
 //middlewares
 app.use(express.json());
 app.use(cookieParser());
+const cors = require("cors");
+
 app.use(cors({
-  origin: ["https://your-vercel-app.vercel.app"],
-  credentials: true
+  origin: "*"
 }));
 
 app.use(
