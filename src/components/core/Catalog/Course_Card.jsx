@@ -46,4 +46,4 @@ const CourseCard = ({course, Height}) => {
   )
 }
 
-export default Course_Card
+export default CourseCard
