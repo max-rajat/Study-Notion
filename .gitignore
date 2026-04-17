@@ -1,0 +1,76 @@
+# ======================
+# NODE MODULES
+# ======================
+node_modules/
+*/node_modules/
+
+# ======================
+# ENV FILES (VERY IMPORTANT)
+# ======================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ======================
+# LOG FILES
+# ======================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ======================
+# BUILD FILES
+# ======================
+build/
+dist/
+.next/
+out/
+
+# ======================
+# REACT / FRONTEND
+# ======================
+client/build/
+client/node_modules/
+
+# ======================
+# SERVER / BACKEND
+# ======================
+server/node_modules/
+server/.env
+
+# ======================
+# OS FILES
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# IDE FILES
+# ======================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ======================
+# CACHE FILES
+# ======================
+.cache/
+.parcel-cache/
+
+# ======================
+# TEST COVERAGE
+# ======================
+coverage/
+
+# ======================
+# MISC
+# ======================
+*.log
+*.tmp
+*.temp
