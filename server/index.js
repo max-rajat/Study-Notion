@@ -24,7 +24,7 @@ app.use(cookieParser());
 
 
 app.use(cors({
-  origin: "https://your-frontend.vercel.app",
+  origin: "study-notion-one-sigma.vercel.app",
   credentials: true
 }));
 
