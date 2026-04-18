@@ -8,7 +8,7 @@ const courseRoutes = require("./routes/Course");
 const contactUsRoute = require("./routes/Contact");
 const database = require("./config/database");
 const cookieParser = require("cookie-parser");
-const cors = require("cors");
+
 const {cloudinaryConnect } = require("./config/cloudinary");
 const fileUpload = require("express-fileupload");
 const dotenv = require("dotenv");
@@ -23,13 +23,29 @@ app.use(express.json());
 app.use(cookieParser());
 
 
-app.use(cors({
-origin: [
+const cors = require("cors");
+
+const allowedOrigins = [
   "http://localhost:3000",
-  "study-notion-one-sigma.vercel.app"
-],
-  credentials: true
-}));
+  "https://study-notion-one-sigma.vercel.app"
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like mobile apps, Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
+
 
 app.use(
 	fileUpload({
