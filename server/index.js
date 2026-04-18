@@ -23,12 +23,8 @@ app.use(express.json());
 app.use(cookieParser());
 
 
-const cors = require("cors");
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://study-notion-one-sigma.vercel.app"
-];
+
 
 const cors = require("cors");
 
