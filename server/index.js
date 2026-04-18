@@ -30,21 +30,18 @@ const allowedOrigins = [
   "https://study-notion-one-sigma.vercel.app"
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // allow requests with no origin (like mobile apps, Postman)
-      if (!origin) return callback(null, true);
+const cors = require("cors");
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://study-notion-one-sigma.vercel.app"
+  ],
+  credentials: true,
+}));
+
+// important for preflight
+app.options("*", cors());
 
 
 app.use(
