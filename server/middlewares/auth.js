@@ -9,10 +9,16 @@ dotenv.config();
 exports.auth = async (req, res, next) => {
 	try {
 		// Extracting JWT from request cookies, body or header
+		// --- Original: req.header("Authorization").replace(...) throws when the
+		//     header is absent. Optional chaining lets it fall through to "Token Missing". ---
+		// const token =
+		// 	req.cookies.token ||
+		// 	req.body.token ||
+		// 	req.header("Authorization").replace("Bearer ", "");
 		const token =
 			req.cookies.token ||
 			req.body.token ||
-			req.header("Authorization").replace("Bearer ", "");
+			req.header("Authorization")?.replace("Bearer ", "");
 
 		// If JWT is missing, return 401 Unauthorized response
 		if (!token) {
@@ -22,7 +28,7 @@ exports.auth = async (req, res, next) => {
 		try {
 			// Verifying the JWT using the secret key stored in environment variables
 			const decode = await jwt.verify(token, process.env.JWT_SECRET);
-			console.log(decode);
+			// console.log(decode); // avoid logging decoded token payload
 			// Storing the decoded JWT payload in the request object for further use
 			req.user = decode;
 		} catch (error) {
@@ -79,9 +85,8 @@ exports.isAdmin = async (req, res, next) => {
 exports.isInstructor = async (req, res, next) => {
 	try {
 		const userDetails = await User.findOne({ email: req.user.email });
-		console.log(userDetails);
-
-		console.log(userDetails.accountType);
+		// console.log(userDetails); // avoid logging full user record
+		// console.log(userDetails.accountType);
 
 		if (userDetails.accountType !== "Instructor") {
 			return res.status(401).json({

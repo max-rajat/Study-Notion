@@ -20,7 +20,7 @@ body {
 }
 
 *::-webkit-scrollbar-track {
-  background: #000814;
+  background: rgb(var(--rb-900));
 }
 
 *::-webkit-scrollbar-thumb {
@@ -203,6 +203,12 @@ details > summary::-webkit-details-marker {
 .active-icon {
   fill: #ffd60a !important;
   color: #ffd60a !important;
+}
+
+/* Match the greenish accent in light mode */
+:root.light .active-icon {
+  fill: #06d6a0 !important;
+  color: #06d6a0 !important;
 }
 
 .inactive-icon {

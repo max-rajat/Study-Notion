@@ -1,3 +1,70 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ===== Theme: richblack palette as RGB channels =====
+   Default (dark) keeps the original values. Adding the `light` class on
+   <html> inverts the scale, which flips the whole app to a light theme. */
+:root {
+  --rb-5: 241 242 255;
+  --rb-25: 219 221 234;
+  --rb-50: 197 199 212;
+  --rb-100: 175 178 191;
+  --rb-200: 153 157 170;
+  --rb-300: 131 136 148;
+  --rb-400: 110 114 127;
+  --rb-500: 88 93 105;
+  --rb-600: 66 72 84;
+  --rb-700: 44 51 63;
+  --rb-800: 22 29 41;
+  --rb-900: 0 8 20;
+
+  /* Accent: yellow (dark mode) */
+  --yl-5: 255 249 112;
+  --yl-25: 255 232 61;
+  --yl-50: 255 214 10;
+  --yl-100: 231 192 9;
+  --yl-200: 207 171 8;
+  --yl-300: 182 149 7;
+  --yl-400: 158 128 6;
+  --yl-500: 134 106 4;
+  --yl-600: 110 85 3;
+  --yl-700: 85 63 2;
+  --yl-800: 61 42 1;
+  --yl-900: 37 20 0;
+}
+
+:root.light {
+  --rb-5: 0 8 20;
+  --rb-25: 22 29 41;
+  --rb-50: 44 51 63;
+  --rb-100: 66 72 84;
+  --rb-200: 88 93 105;
+  --rb-300: 110 114 127;
+  --rb-400: 131 136 148;
+  --rb-500: 153 157 170;
+  --rb-600: 175 178 191;
+  --rb-700: 197 199 212;
+  --rb-800: 219 221 234;
+  --rb-900: 241 242 255;
+
+  /* Accent: yellow -> greenish (caribbeangreen) in light mode */
+  --yl-5: 193 255 253;
+  --yl-25: 131 241 222;
+  --yl-50: 68 228 191;
+  --yl-100: 6 214 160;
+  --yl-200: 5 191 142;
+  --yl-300: 5 167 123;
+  --yl-400: 4 144 105;
+  --yl-500: 3 121 87;
+  --yl-600: 2 97 68;
+  --yl-700: 1 74 50;
+  --yl-800: 1 50 31;
+  --yl-900: 0 27 13;
+}
+
+/* In light mode, literal white text would be invisible on light backgrounds,
+   so render it as a dark gray instead. (bg-white backgrounds are left as-is.) */
+:root.light .text-white {
+  color: #2d2d2d;
+}

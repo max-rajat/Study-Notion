@@ -1,21 +1,26 @@
 import { useEffect, useState } from "react"
 import { AiOutlineMenu, AiOutlineShoppingCart } from "react-icons/ai"
-import { BsChevronDown } from "react-icons/bs"
+import { BsChevronDown, BsSun, BsMoonStars } from "react-icons/bs"
 import { useSelector } from "react-redux"
 import { Link, matchPath, useLocation } from "react-router-dom"
 
-import logo from "../../assets/Logo/Logo-Full-Light.png"
+import logoLight from "../../assets/Logo/Logo-Full-Light.png"
+import logoDark from "../../assets/Logo/Logo-Full-Dark.png"
 import { NavbarLinks } from "../../data/navbar-links"
 import { apiConnector } from "../../services/apiconnector"
 import { categories } from "../../services/apis"
 import { ACCOUNT_TYPE } from "../../utils/constants"
+import { useTheme } from "../../context/ThemeContext"
 import ProfileDropdown from "../core/Auth/ProfileDropDown"
 
 function Navbar() {
   const { token } = useSelector((state) => state.auth)
   const { user } = useSelector((state) => state.profile)
   const { totalItems } = useSelector((state) => state.cart)
+  const { theme, toggleTheme } = useTheme()
   const location = useLocation()
+  const isLight = theme === "light"
+  const isHome = location.pathname === "/"
 
   const [subLinks, setSubLinks] = useState([])
   const [loading, setLoading] = useState(false)
@@ -41,14 +46,26 @@ function Navbar() {
 
   return (
     <div
-      className={`flex h-14 items-center justify-center border-b-[1px] border-b-richblack-700 ${
-        location.pathname !== "/" ? "bg-richblack-800" : ""
+      className={`flex h-14 items-center justify-center border-b-[1px] ${
+        isLight ? "border-b-pure-greys-25" : "border-b-richblack-700"
+      } ${
+        isHome
+          ? "bg-transparent"
+          : isLight
+          ? "bg-white shadow-sm"
+          : "bg-richblack-800"
       } transition-all duration-200`}
     >
       <div className="flex w-11/12 max-w-maxContent items-center justify-between">
         {/* Logo */}
         <Link to="/">
-          <img src={logo} alt="Logo" width={160} height={32} loading="lazy" />
+          <img
+            src={isLight ? logoDark : logoLight}
+            alt="Logo"
+            width={160}
+            height={32}
+            loading="lazy"
+          />
         </Link>
         {/* Navigation links */}
         <nav className="hidden md:block">
@@ -112,6 +129,22 @@ function Navbar() {
             ))}
           </ul>
         </nav>
+        {/* Right side actions */}
+        <div className="flex items-center gap-x-4">
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="grid h-9 w-9 place-items-center rounded-full text-richblack-100 transition-colors hover:bg-richblack-700"
+          >
+            {theme === "dark" ? (
+              <BsSun className="text-lg" />
+            ) : (
+              <BsMoonStars className="text-lg" />
+            )}
+          </button>
+
         {/* Login / Signup / Dashboard */}
         <div className="hidden items-center gap-x-4 md:flex">
           {user && user?.accountType !== ACCOUNT_TYPE.INSTRUCTOR && (
@@ -140,9 +173,10 @@ function Navbar() {
           )}
           {token !== null && <ProfileDropdown />}
         </div>
-        <button className="mr-4 md:hidden">
-          <AiOutlineMenu fontSize={24} fill="#AFB2BF" />
-        </button>
+          <button className="md:hidden">
+            <AiOutlineMenu fontSize={24} fill={isLight ? "#424854" : "#AFB2BF"} />
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken")
 const otpGenerator = require("otp-generator")
 const mailSender = require("../utils/mailSender")
 const { passwordUpdated } = require("../mail/templates/passwordUpdate")
+const otpTemplate = require("../mail/templates/emailVerificationTemplate")
 const Profile = require("../models/Profile")
 require("dotenv").config()
 
@@ -57,7 +58,7 @@ exports.signup = async (req, res) => {
 
     // Find the most recent OTP for the email
     const response = await OTP.find({ email }).sort({ createdAt: -1 }).limit(1)
-    console.log(response)
+    // console.log(response)
     if (response.length === 0) {
       // OTP not found for the email
       return res.status(400).json({
@@ -76,8 +77,11 @@ exports.signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     // Create the user
-    let approved = ""
-    approved === "Instructor" ? (approved = false) : (approved = true)
+    // --- Original (buggy): compared "" to "Instructor", so approved was always true ---
+    // let approved = ""
+    // approved === "Instructor" ? (approved = false) : (approved = true)
+    // Instructors must be approved before they are active; everyone else is approved.
+    let approved = accountType === "Instructor" ? false : true
 
     // Create the Additional Profile For User
     const profileDetails = await Profile.create({
@@ -142,7 +146,9 @@ exports.login = async (req, res) => {
     // Generate JWT token and Compare Password
     if (await bcrypt.compare(password, user.password)) {
       const token = jwt.sign(
-        { email: user.email, id: user._id, role: user.role },
+        // --- Original: used user.role, which doesn't exist on the model (was undefined) ---
+        // { email: user.email, id: user._id, role: user.role },
+        { email: user.email, id: user._id, accountType: user.accountType },
         process.env.JWT_SECRET,
         {
           expiresIn: "24h",
@@ -202,22 +208,46 @@ exports.sendotp = async (req, res) => {
       lowerCaseAlphabets: false,
       specialChars: false,
     })
-    const result = await OTP.findOne({ otp: otp })
-    console.log("Result is Generate OTP Func")
-    console.log("OTP", otp)
-    console.log("Result", result)
+    // console.log("Result is Generate OTP Func")
+    // console.log("OTP", otp)
+    // console.log("Result", result)
+
+    // --- Original: regeneration dropped the numeric-only options, so a retry
+    //     could produce letters/symbols. Keep the same options on every retry. ---
+    // const result = await OTP.findOne({ otp: otp })
+    // while (result) {
+    //   otp = otpGenerator.generate(6, {
+    //     upperCaseAlphabets: false,
+    //   })
+    // }
+    let result = await OTP.findOne({ otp: otp })
     while (result) {
       otp = otpGenerator.generate(6, {
         upperCaseAlphabets: false,
+        lowerCaseAlphabets: false,
+        specialChars: false,
       })
+      result = await OTP.findOne({ otp: otp })
     }
+
     const otpPayload = { email, otp }
     const otpBody = await OTP.create(otpPayload)
-    console.log("OTP Body", otpBody)
+    // console.log("OTP Body", otpBody)
+
+    // Email the OTP to the user instead of returning it in the response.
+    // (The OTP model may also send mail on save; this guarantees delivery and
+    //  keeps the secret out of the HTTP response.)
+    await mailSender(email, "Verification Email from StudyNotion", otpTemplate(otp))
+
+    // --- Original returned the OTP in the response body (security leak): ---
+    // res.status(200).json({
+    //   success: true,
+    //   message: `OTP Sent Successfully`,
+    //   otp,
+    // })
     res.status(200).json({
       success: true,
       message: `OTP Sent Successfully`,
-      otp,
     })
   } catch (error) {
     console.log(error.message)
