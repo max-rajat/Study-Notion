@@ -1,5 +1,5 @@
 import "./App.css";
-import {Route, Routes, useNavigate } from "react-router-dom";
+import {Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import Home from "./pages/Home"
 import Navbar from "./components/common/Navbar"
 import OpenRoute from "./components/core/Auth/OpenRoute"
@@ -28,18 +28,29 @@ import CourseDetails from "./pages/CourseDetails";
 import ViewCourse from "./pages/ViewCourse";
 import VideoDetails from "./components/core/ViewCourse/VideoDetails";
 import Instructor from "./components/core/Dashboard/InstructorDashboard/Instructor";
+import AdminRoute from "./AdminPanel/components/AdminRoute";
+import AdminLayout from "./AdminPanel/components/AdminLayout";
+import AdminLogin from "./AdminPanel/pages/AdminLogin";
+import AdminCatalogs from "./AdminPanel/pages/AdminCatalogs";
+import AdminCourses from "./AdminPanel/pages/AdminCourses";
+import AdminUsers from "./AdminPanel/pages/AdminUsers";
+import { Navigate } from "react-router-dom";
 
 function App() {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
   const { user } = useSelector((state) => state.profile)
+
+  // The admin site is a separate experience — hide the public site navbar there.
+  const isAdminSite = location.pathname.startsWith("/admin")
 
 
   return (
    <div className="w-screen min-h-screen bg-richblack-900 flex flex-col font-inter">
-    <Navbar/>
+    {!isAdminSite && <Navbar/>}
     <Routes>
       <Route path="/" element={<Home/>} />
       <Route path="catalog/:catalogName" element={<Catalog/>} />
@@ -127,7 +138,7 @@ function App() {
           <Route path="dashboard/add-course" element={<AddCourse />} />
           <Route path="dashboard/my-courses" element={<MyCourses />} />
           <Route path="dashboard/edit-course/:courseId" element={<EditCourse />} />
-          
+
           </>
         )
       }
@@ -156,6 +167,22 @@ function App() {
       </Route>
 
 
+
+    {/* ===== Separate Admin Site ===== */}
+    <Route path="/admin/login" element={<AdminLogin />} />
+    <Route
+      path="/admin"
+      element={
+        <AdminRoute>
+          <AdminLayout />
+        </AdminRoute>
+      }
+    >
+      <Route index element={<Navigate to="/admin/catalogs" replace />} />
+      <Route path="catalogs" element={<AdminCatalogs />} />
+      <Route path="courses" element={<AdminCourses />} />
+      <Route path="users" element={<AdminUsers />} />
+    </Route>
 
     <Route path="*" element={<Error />} />
 

@@ -44,6 +44,17 @@ export const courseEndpoints = {
   CREATE_RATING_API: BASE_URL + "/course/createRating",
 }
 
+// ADMIN ENDPOINTS
+export const adminEndpoints = {
+  CREATE_CATEGORY_API: BASE_URL + "/course/createCategory",
+  UPDATE_CATEGORY_API: BASE_URL + "/course/updateCategory",
+  DELETE_CATEGORY_API: BASE_URL + "/course/deleteCategory",
+  SHOW_ALL_CATEGORIES_API: BASE_URL + "/course/showAllCategories",
+  GET_ALL_USERS_API: BASE_URL + "/admin/getAllUsers",
+  DELETE_USER_API: BASE_URL + "/admin/deleteUser",
+  GET_ALL_COURSES_API: BASE_URL + "/course/getAllCourses",
+}
+
 // RATINGS AND REVIEWS
 export const ratingsEndpoints = {
   REVIEWS_DETAILS_API: BASE_URL + "/course/getReviews",

@@ -23,7 +23,64 @@ exports.createCategory = async (req, res) => {
 		});
 	} catch (error) {
 		return res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+exports.updateCategory = async (req, res) => {
+	try {
+		const { categoryId, name, description } = req.body;
+		if (!categoryId) {
+			return res
+				.status(400)
+				.json({ success: false, message: "Category id is required" });
+		}
+		const updated = await Category.findByIdAndUpdate(
+			categoryId,
+			{ ...(name && { name }), ...(description !== undefined && { description }) },
+			{ new: true }
+		);
+		if (!updated) {
+			return res
+				.status(404)
+				.json({ success: false, message: "Category not found" });
+		}
+		return res.status(200).json({
 			success: true,
+			message: "Category Updated Successfully",
+			data: updated,
+		});
+	} catch (error) {
+		return res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+exports.deleteCategory = async (req, res) => {
+	try {
+		const { categoryId } = req.body;
+		if (!categoryId) {
+			return res
+				.status(400)
+				.json({ success: false, message: "Category id is required" });
+		}
+		const deleted = await Category.findByIdAndDelete(categoryId);
+		if (!deleted) {
+			return res
+				.status(404)
+				.json({ success: false, message: "Category not found" });
+		}
+		return res.status(200).json({
+			success: true,
+			message: "Category Deleted Successfully",
+		});
+	} catch (error) {
+		return res.status(500).json({
+			success: false,
 			message: error.message,
 		});
 	}
@@ -68,28 +125,23 @@ exports.categoryPageDetails = async (req, res) => {
           .status(404)
           .json({ success: false, message: "Category not found" })
       }
-      // Handle the case when there are no courses
-      if (selectedCategory.courses.length === 0) {
-        console.log("No courses found for the selected category.")
-        return res.status(404).json({
-          success: false,
-          message: "No courses found for the selected category.",
-        })
-      }
-  
-      // Get courses for other categories
+      // Get courses for other categories (guard against there being none)
       const categoriesExceptSelected = await Category.find({
         _id: { $ne: categoryId },
       })
-      let differentCategory = await Category.findOne(
-        categoriesExceptSelected[getRandomInt(categoriesExceptSelected.length)]
-          ._id
-      )
-        .populate({
-          path: "courses",
-          match: { status: "Published" },
-        })
-        .exec()
+      let differentCategory = null
+      if (categoriesExceptSelected.length > 0) {
+        const randomCategory =
+          categoriesExceptSelected[
+            getRandomInt(categoriesExceptSelected.length)
+          ]
+        differentCategory = await Category.findById(randomCategory._id)
+          .populate({
+            path: "courses",
+            match: { status: "Published" },
+          })
+          .exec()
+      }
         //console.log("Different COURSE", differentCategory)
       // Get top-selling courses across all categories
       const allCategories = await Category.find()

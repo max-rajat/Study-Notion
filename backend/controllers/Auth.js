@@ -5,7 +5,6 @@ const jwt = require("jsonwebtoken")
 const otpGenerator = require("otp-generator")
 const mailSender = require("../utils/mailSender")
 const { passwordUpdated } = require("../mail/templates/passwordUpdate")
-const otpTemplate = require("../mail/templates/emailVerificationTemplate")
 const Profile = require("../models/Profile")
 require("dotenv").config()
 
@@ -231,13 +230,10 @@ exports.sendotp = async (req, res) => {
     }
 
     const otpPayload = { email, otp }
+    // Creating the OTP document triggers the model's pre-save hook, which emails
+    // the OTP to the user. (No need to call mailSender here — that would double-send.)
     const otpBody = await OTP.create(otpPayload)
     // console.log("OTP Body", otpBody)
-
-    // Email the OTP to the user instead of returning it in the response.
-    // (The OTP model may also send mail on save; this guarantees delivery and
-    //  keeps the secret out of the HTTP response.)
-    await mailSender(email, "Verification Email from StudyNotion", otpTemplate(otp))
 
     // --- Original returned the OTP in the response body (security leak): ---
     // res.status(200).json({

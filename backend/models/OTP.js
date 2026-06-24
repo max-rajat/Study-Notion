@@ -30,7 +30,13 @@ async function sendVerificationEmail(email, otp) {
 			"Verification Email",
 			emailTemplate(otp)
 		);
-		console.log("Email sent successfully: ", mailResponse.response);
+		// --- Original: mailResponse.response throws if mailSender returns undefined
+		//     (which it does when sending fails), masking the real error. ---
+		// console.log("Email sent successfully: ", mailResponse.response);
+		if (!mailResponse) {
+			throw new Error("Email could not be sent — check MAIL_* credentials");
+		}
+		console.log("Email sent successfully: ", mailResponse?.response);
 	} catch (error) {
 		console.log("Error occurred while sending email: ", error);
 		throw error;

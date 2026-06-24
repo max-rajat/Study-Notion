@@ -32,14 +32,15 @@ out/
 # ======================
 # REACT / FRONTEND
 # ======================
-client/build/
-client/node_modules/
+frontend/build/
+frontend/node_modules/
+frontend/.env
 
 # ======================
 # SERVER / BACKEND
 # ======================
-server/node_modules/
-server/.env
+backend/node_modules/
+backend/.env
 
 # ======================
 # OS FILES

@@ -20,6 +20,8 @@ const {
 const {
   showAllCategories,
   createCategory,
+  updateCategory,
+  deleteCategory,
   categoryPageDetails,
 } = require("../controllers/Category")
 
@@ -90,6 +92,8 @@ router.post("/updateCourseProgress", auth, isStudent, updateCourseProgress);
 // Category can Only be Created by Admin
 // TODO: Put IsAdmin Middleware here
 router.post("/createCategory", auth, isAdmin, createCategory)
+router.put("/updateCategory", auth, isAdmin, updateCategory)
+router.delete("/deleteCategory", auth, isAdmin, deleteCategory)
 router.get("/showAllCategories", showAllCategories)
 router.post("/getCategoryPageDetails", categoryPageDetails)
 
