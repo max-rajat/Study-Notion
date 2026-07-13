@@ -8,8 +8,9 @@ import { deleteUser, fetchAllUsers } from "../services/adminAPI"
 const FILTERS = ["All", "Student", "Instructor", "Admin"]
 
 export default function AdminUsers() {
-  const { token } = useSelector((state) => state.auth)
-  const { user: currentUser } = useSelector((state) => state.profile)
+  const { adminToken: token, adminUser: currentUser } = useSelector(
+    (state) => state.adminAuth
+  )
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState("All")

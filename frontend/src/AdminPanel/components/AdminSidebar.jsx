@@ -2,7 +2,7 @@ import { VscAccount, VscFiles, VscListUnordered, VscSignOut } from "react-icons/
 import { useDispatch } from "react-redux"
 import { NavLink, useNavigate } from "react-router-dom"
 
-import { logout } from "../../services/operations/authAPI"
+import { adminLogout } from "../services/adminAPI"
 
 const adminLinks = [
   { name: "Catalogs", path: "/admin/catalogs", icon: VscListUnordered },
@@ -42,7 +42,7 @@ export default function AdminSidebar() {
       </div>
 
       <button
-        onClick={() => dispatch(logout(navigate))}
+        onClick={() => dispatch(adminLogout(navigate))}
         className="px-6 py-2 text-sm font-medium text-richblack-300"
       >
         <div className="flex items-center gap-x-2">

@@ -3,15 +3,14 @@ import { Navigate } from "react-router-dom"
 
 import { ACCOUNT_TYPE } from "../../utils/constants"
 
-// Protects the admin site: requires a logged-in user with the Admin account type.
+// Protects the admin site: requires an admin session (separate from the public site).
 export default function AdminRoute({ children }) {
-  const { token } = useSelector((state) => state.auth)
-  const { user } = useSelector((state) => state.profile)
+  const { adminToken, adminUser } = useSelector((state) => state.adminAuth)
 
-  if (token === null) {
+  if (!adminToken) {
     return <Navigate to="/admin/login" replace />
   }
-  if (user?.accountType !== ACCOUNT_TYPE.ADMIN) {
+  if (adminUser?.accountType !== ACCOUNT_TYPE.ADMIN) {
     return <Navigate to="/admin/login" replace />
   }
   return children

@@ -100,16 +100,17 @@ including the number of views, clicks, and other relevant metrics.
 and delete courses, as well as manage the course content and pricing.
 * View and Edit Profile Details: These pages will allow the instructor to view and edit
 their account details.
-PAGE 3
-For Admin (this is for future scope):
-* Dashboard: This page will have an overview of the platform's courses, instructors,
-and students.
-* Insights: This page will have detailed insights into the platform's metrics, including
-the number of registered users, courses, and revenue.
-* Instructor Management: This page will allow the admin to manage the platform's
-instructors, including their account details, courses, and ratings.
-* Other Relevant Pages: The admin will also have access to other relevant pages, such
-as user management and course management pages.
+### For Admin:
+The Admin Panel is implemented as a **separate site** mounted under `/admin`, with its
+own login, layout, and — importantly — its own isolated session (see the Admin Panel
+section below). It currently provides:
+* Catalog Management: Create, edit, and delete course catalogs (categories). This
+replaces the earlier manual/Postman workflow for creating categories.
+* All Courses: View every published course on the platform, along with its instructor,
+price, and enrolled-student count.
+* User Management: View all students, instructors, and admins (filterable by account
+type) and delete users (with cascading cleanup of their profile, enrollments, and
+course progress).
 
 To build the front end, we use frameworks and libraries such as ReactJS, We also use CSS and Tailwind, which are
 styling frameworks that help make the user interface look good and responsive.

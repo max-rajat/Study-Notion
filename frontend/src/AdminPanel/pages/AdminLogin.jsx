@@ -9,14 +9,13 @@ import { ACCOUNT_TYPE } from "../../utils/constants"
 export default function AdminLogin() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const { token } = useSelector((state) => state.auth)
-  const { user } = useSelector((state) => state.profile)
+  const { adminToken, adminUser } = useSelector((state) => state.adminAuth)
 
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({ email: "", password: "" })
 
   // Already an authenticated admin? skip the login screen
-  if (token !== null && user?.accountType === ACCOUNT_TYPE.ADMIN) {
+  if (adminToken && adminUser?.accountType === ACCOUNT_TYPE.ADMIN) {
     return <Navigate to="/admin" replace />
   }
 

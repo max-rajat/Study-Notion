@@ -12,7 +12,7 @@ import {
 } from "../services/adminAPI"
 
 export default function AdminCatalogs() {
-  const { token } = useSelector((state) => state.auth)
+  const { adminToken: token } = useSelector((state) => state.adminAuth)
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(null) // category being edited

@@ -5,7 +5,7 @@ import AdminSidebar from "./AdminSidebar"
 
 // Top-level shell for the separate admin site: sidebar + header + page outlet.
 export default function AdminLayout() {
-  const { user } = useSelector((state) => state.profile)
+  const { adminUser: user } = useSelector((state) => state.adminAuth)
 
   return (
     <div className="flex min-h-screen w-full bg-richblack-900">

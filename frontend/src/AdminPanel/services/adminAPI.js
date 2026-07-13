@@ -1,7 +1,10 @@
 import { toast } from "react-hot-toast"
 
-import { setLoading, setToken } from "../../slices/authSlice"
-import { setUser } from "../../slices/profileSlice"
+import {
+  setAdminLoading,
+  setAdminToken,
+  setAdminUser,
+} from "../../slices/adminAuthSlice"
 import { apiConnector } from "../../services/apiconnector"
 import { adminEndpoints, endpoints } from "../../services/apis"
 
@@ -17,11 +20,13 @@ const {
 
 const { LOGIN_API } = endpoints
 
-// Admin login — reuses the normal login API but only allows Admin accounts
+// Admin login — reuses the normal login API but only allows Admin accounts.
+// Stores the session under dedicated admin keys so it stays isolated from the
+// public user site (which uses "token" / "user").
 export function adminLogin(email, password, navigate) {
   return async (dispatch) => {
     const toastId = toast.loading("Loading...")
-    dispatch(setLoading(true))
+    dispatch(setAdminLoading(true))
     try {
       const response = await apiConnector("POST", LOGIN_API, { email, password })
       if (!response.data.success) {
@@ -32,21 +37,33 @@ export function adminLogin(email, password, navigate) {
       }
 
       toast.success("Admin Login Successful")
-      dispatch(setToken(response.data.token))
+      dispatch(setAdminToken(response.data.token))
       const userImage = response.data?.user?.image
         ? response.data.user.image
         : `https://api.dicebear.com/5.x/initials/svg?seed=${response.data.user.firstName} ${response.data.user.lastName}`
-      dispatch(setUser({ ...response.data.user, image: userImage }))
+      dispatch(setAdminUser({ ...response.data.user, image: userImage }))
 
-      localStorage.setItem("token", JSON.stringify(response.data.token))
-      localStorage.setItem("user", JSON.stringify(response.data.user))
+      localStorage.setItem("adminToken", JSON.stringify(response.data.token))
+      localStorage.setItem("adminUser", JSON.stringify(response.data.user))
       navigate("/admin")
     } catch (error) {
       console.log("ADMIN LOGIN API ERROR............", error)
       toast.error(error?.response?.data?.message || error.message || "Login Failed")
     }
-    dispatch(setLoading(false))
+    dispatch(setAdminLoading(false))
     toast.dismiss(toastId)
+  }
+}
+
+// Admin logout — clears ONLY the admin session, leaving the public site untouched.
+export function adminLogout(navigate) {
+  return (dispatch) => {
+    dispatch(setAdminToken(null))
+    dispatch(setAdminUser(null))
+    localStorage.removeItem("adminToken")
+    localStorage.removeItem("adminUser")
+    toast.success("Admin Logged Out")
+    navigate("/admin/login")
   }
 }
 
