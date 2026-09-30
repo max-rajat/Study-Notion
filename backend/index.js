@@ -28,12 +28,16 @@ app.use(cookieParser());
 
 
 const cors = require("cors");
+const allowedOrigins = [
+  "http://localhost:3000",
+];
+// Add production frontend URL from env if set
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
 
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://study-notion-one-sigma.vercel.app"
-  ],
+  origin: allowedOrigins,
   credentials: true,
 }));
 
