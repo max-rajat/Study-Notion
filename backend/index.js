@@ -37,7 +37,15 @@ if (process.env.FRONTEND_URL) {
 }
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Allow if in the explicit list
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow any Vercel preview/deployment URL for this project
+    if (origin.endsWith(".vercel.app")) return callback(null, true);
+    callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
 }));
 
