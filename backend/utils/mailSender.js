@@ -1,30 +1,29 @@
 const nodemailer = require("nodemailer");
 
-// Three delivery paths, chosen by configuration and tried in this order:
+// Two delivery paths, chosen by configuration:
 //
 //   BREVO_API_KEY set   -> Brevo's HTTP API over port 443
-//   RESEND_API_KEY set  -> Resend's HTTP API over port 443
 //   otherwise           -> SMTP via nodemailer (MAIL_HOST/MAIL_USER/MAIL_PASS)
 //
-// The HTTP paths exist because most PaaS free tiers (Render, Fly, Heroku,
-// Railway below Pro) block outbound SMTP on ports 25/465/587 to curb spam.
-// Packets are dropped rather than refused, so an SMTP send there doesn't fail
-// — it hangs until the connection times out. Port 443 is never blocked.
+// Brevo exists because most PaaS free tiers (Render, Fly, Heroku, Railway
+// below Pro) block outbound SMTP on ports 25/465/587 to curb spam. Packets
+// are dropped rather than refused, so an SMTP send there doesn't fail — it
+// hangs until the connection times out. Port 443 is never blocked, and Brevo
+// delivers to any recipient once a single sender address is verified — no
+// domain required.
 //
-// Brevo is tried first because, unlike Resend, it delivers to any recipient
-// once a single sender address is verified — no domain required. Resend
-// without a verified domain only delivers to the address that owns the
-// account, which is fine for testing but not for real signups.
+// --- A Resend HTTP path previously lived here too. It was removed: Resend's
+//     sandbox mode only delivers to the address that owns the account until a
+//     domain is verified, which doesn't work for real signups, and once Brevo
+//     was added nothing ever selected Resend again. ---
 //
 // Keeping SMTP means local development can carry on using Gmail unchanged
 // while the deployed instance goes over HTTP.
 
 const TIMEOUT_MS = Number(process.env.MAIL_TIMEOUT_MS) || 16000;
-const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
 const usingBrevo = () => Boolean(process.env.BREVO_API_KEY);
-const usingResend = () => Boolean(process.env.RESEND_API_KEY);
 
 // ---------------------------------------------------------------- Brevo (HTTP)
 
@@ -95,72 +94,6 @@ const sendViaBrevo = async (email, title, body) => {
 	};
 };
 
-// ---------------------------------------------------------------- Resend (HTTP)
-
-const sendViaResend = async (email, title, body) => {
-	// Resend only accepts a `from` on a domain you have verified. Until a domain
-	// is added, onboarding@resend.dev works but will ONLY deliver to the email
-	// address that owns the Resend account.
-	const from = process.env.MAIL_FROM || "StudyNotion <onboarding@resend.dev>";
-
-	const controller = new AbortController();
-	const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-	let response;
-	try {
-		response = await fetch(RESEND_ENDPOINT, {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				from,
-				to: [email],
-				subject: title,
-				html: body,
-			}),
-			signal: controller.signal,
-		});
-	} catch (error) {
-		if (error.name === "AbortError") {
-			throw new Error(
-				`Resend did not respond within ${TIMEOUT_MS}ms. Raise MAIL_TIMEOUT_MS or check outbound HTTPS access.`
-			);
-		}
-		throw new Error(`Could not reach the Resend API: ${error.message}`);
-	} finally {
-		clearTimeout(timer);
-	}
-
-	const payload = await response.json().catch(() => ({}));
-
-	if (!response.ok) {
-		const detail = payload?.message || payload?.error || response.statusText;
-
-		if (response.status === 401 || response.status === 403) {
-			throw new Error(`Resend rejected RESEND_API_KEY: ${detail}`);
-		}
-		if (response.status === 422) {
-			throw new Error(
-				`Resend rejected the sender "${from}": ${detail}. The from-address must be on a domain verified in Resend; without one, use onboarding@resend.dev, which can only deliver to the address that owns the account.`
-			);
-		}
-		if (response.status === 429) {
-			throw new Error(`Resend rate limit reached: ${detail}`);
-		}
-		throw new Error(`Resend returned ${response.status}: ${detail}`);
-	}
-
-	// Mirror nodemailer's shape so existing callers that read `.response` or
-	// `.messageId` keep working.
-	return {
-		messageId: payload.id,
-		response: `Resend accepted the message (id ${payload.id})`,
-		provider: "resend",
-	};
-};
-
 // ------------------------------------------------------------------ SMTP
 
 // Which ports to attempt, in order. A host may block one submission port and
@@ -202,7 +135,7 @@ const describeSmtpFailure = (error, portsTried) => {
 	const port = (portsTried || candidatePorts()).join("/");
 
 	if (!host || !process.env.MAIL_USER || !process.env.MAIL_PASS) {
-		return "Mail is not configured: set RESEND_API_KEY, or all of MAIL_HOST, MAIL_USER and MAIL_PASS.";
+		return "Mail is not configured: set BREVO_API_KEY, or all of MAIL_HOST, MAIL_USER and MAIL_PASS.";
 	}
 	if (error.code === "EAUTH") {
 		return `SMTP rejected the credentials for ${process.env.MAIL_USER}. For Gmail this must be a 16-character App Password, not the account password.`;
@@ -213,7 +146,7 @@ const describeSmtpFailure = (error, portsTried) => {
 		error.code === "ECONNECTION" ||
 		error.code === "ECONNREFUSED"
 	) {
-		return `Could not open an SMTP connection to ${host}:${port} within ${TIMEOUT_MS}ms. Outbound SMTP is most likely blocked — Render, Fly and Heroku all block ports 25/465/587. Set RESEND_API_KEY to send over HTTPS instead.`;
+		return `Could not open an SMTP connection to ${host}:${port} within ${TIMEOUT_MS}ms. Outbound SMTP is most likely blocked — Render, Fly and Heroku all block ports 25/465/587. Set BREVO_API_KEY to send over HTTPS instead.`;
 	}
 	return `Sending mail via ${host}:${port} failed: ${error.message}`;
 };
@@ -265,11 +198,7 @@ const sendViaSmtp = async (email, title, body) => {
 // --- Original swallowed every error and returned undefined, so callers that
 //     read `info.response` crashed with a TypeError and reported a misleading
 //     failure. Errors now propagate and each caller decides. ---
-const activeProvider = () => {
-	if (usingBrevo()) return "brevo";
-	if (usingResend()) return "resend";
-	return "smtp";
-};
+const activeProvider = () => (usingBrevo() ? "brevo" : "smtp");
 
 const mailSender = async (email, title, body) => {
 	if (!email) {
@@ -277,14 +206,9 @@ const mailSender = async (email, title, body) => {
 	}
 
 	try {
-		switch (activeProvider()) {
-			case "brevo":
-				return await sendViaBrevo(email, title, body);
-			case "resend":
-				return await sendViaResend(email, title, body);
-			default:
-				return await sendViaSmtp(email, title, body);
-		}
+		return usingBrevo()
+			? await sendViaBrevo(email, title, body)
+			: await sendViaSmtp(email, title, body);
 	} catch (error) {
 		console.error(`[mailSender] ${activeProvider()}: ${error.message}`);
 		throw error;
