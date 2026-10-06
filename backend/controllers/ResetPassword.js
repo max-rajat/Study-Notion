@@ -33,11 +33,31 @@ exports.resetPasswordToken = async (req, res) => {
 		).replace(/\/$/, "");
 		const url = `${frontendUrl}/update-password/${token}`;
 
-		await mailSender(
-			email,
-			"Password Reset",
-			`Your Link for email verification is ${url}. Please click this url to reset your password.`
-		);
+		try {
+			await mailSender(
+				email,
+				"Password Reset",
+				`Your Link for email verification is ${url}. Please click this url to reset your password.`
+			);
+		} catch (mailError) {
+			// DEMO_MODE covers the reset flow as well as signup: where no mail
+			// provider is reachable, hand the link back so the flow can still be
+			// completed. Same caveat as signup — this removes the proof of
+			// mailbox ownership, so it is a demo convenience only.
+			if (String(process.env.DEMO_MODE).toLowerCase() !== "true") {
+				throw mailError;
+			}
+			console.warn(
+				`[resetPasswordToken] DEMO_MODE: email delivery failed ` +
+					`(${mailError.message}) — returning the reset link in the response.`
+			);
+			return res.json({
+				success: true,
+				demoMode: true,
+				resetUrl: url,
+				message: `Demo mode: email delivery is unavailable. Use this link to reset your password: ${url}`,
+			});
+		}
 
 		res.json({
 			success: true,

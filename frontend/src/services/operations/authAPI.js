@@ -161,6 +161,16 @@ export function getPasswordResetToken(email , setEmailSent) {
         throw new Error(response.data.message);
       }
 
+      // In demo mode no email is sent; the server returns the reset link so
+      // the flow can still be completed.
+      if (response.data.demoMode && response.data.resetUrl) {
+        toast.success("Demo mode — opening the reset page directly", {
+          duration: 8000,
+        });
+        window.location.assign(response.data.resetUrl);
+        return;
+      }
+
       toast.success("Reset Email Sent");
       setEmailSent(true);
     }
