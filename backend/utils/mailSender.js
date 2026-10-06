@@ -1,22 +1,99 @@
 const nodemailer = require("nodemailer");
 
-// Two delivery paths, chosen by configuration:
+// Three delivery paths, chosen by configuration and tried in this order:
 //
+//   BREVO_API_KEY set   -> Brevo's HTTP API over port 443
 //   RESEND_API_KEY set  -> Resend's HTTP API over port 443
 //   otherwise           -> SMTP via nodemailer (MAIL_HOST/MAIL_USER/MAIL_PASS)
 //
-// The HTTP path exists because most PaaS free tiers (Render, Fly, Heroku) block
-// outbound SMTP on ports 25/465/587 to curb spam. Packets are dropped rather
-// than refused, so an SMTP send there doesn't fail — it hangs until the
-// connection times out. Port 443 is never blocked.
+// The HTTP paths exist because most PaaS free tiers (Render, Fly, Heroku,
+// Railway below Pro) block outbound SMTP on ports 25/465/587 to curb spam.
+// Packets are dropped rather than refused, so an SMTP send there doesn't fail
+// — it hangs until the connection times out. Port 443 is never blocked.
 //
-// Keeping both means local development can carry on using Gmail SMTP unchanged
+// Brevo is tried first because, unlike Resend, it delivers to any recipient
+// once a single sender address is verified — no domain required. Resend
+// without a verified domain only delivers to the address that owns the
+// account, which is fine for testing but not for real signups.
+//
+// Keeping SMTP means local development can carry on using Gmail unchanged
 // while the deployed instance goes over HTTP.
 
 const TIMEOUT_MS = Number(process.env.MAIL_TIMEOUT_MS) || 16000;
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
+const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
+const usingBrevo = () => Boolean(process.env.BREVO_API_KEY);
 const usingResend = () => Boolean(process.env.RESEND_API_KEY);
+
+// ---------------------------------------------------------------- Brevo (HTTP)
+
+const sendViaBrevo = async (email, title, body) => {
+	// Brevo requires the `sender` address to be verified (Settings -> Senders
+	// & IP -> add + click the confirmation link). Once verified it can send to
+	// any recipient — this is the key difference from Resend's sandbox mode.
+	const senderEmail = process.env.MAIL_FROM_ADDRESS || process.env.MAIL_USER;
+	if (!senderEmail) {
+		throw new Error(
+			"BREVO_API_KEY is set but no sender address is configured. Set MAIL_FROM_ADDRESS to the email you verified in Brevo."
+		);
+	}
+
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+	let response;
+	try {
+		response = await fetch(BREVO_ENDPOINT, {
+			method: "POST",
+			headers: {
+				"api-key": process.env.BREVO_API_KEY,
+				"Content-Type": "application/json",
+				Accept: "application/json",
+			},
+			body: JSON.stringify({
+				sender: { email: senderEmail, name: process.env.MAIL_FROM_NAME || "StudyNotion" },
+				to: [{ email }],
+				subject: title,
+				htmlContent: body,
+			}),
+			signal: controller.signal,
+		});
+	} catch (error) {
+		if (error.name === "AbortError") {
+			throw new Error(
+				`Brevo did not respond within ${TIMEOUT_MS}ms. Raise MAIL_TIMEOUT_MS or check outbound HTTPS access.`
+			);
+		}
+		throw new Error(`Could not reach the Brevo API: ${error.message}`);
+	} finally {
+		clearTimeout(timer);
+	}
+
+	const payload = await response.json().catch(() => ({}));
+
+	if (!response.ok) {
+		const detail = payload?.message || response.statusText;
+
+		if (response.status === 401) {
+			throw new Error(`Brevo rejected BREVO_API_KEY: ${detail}`);
+		}
+		if (response.status === 400 && /sender/i.test(detail)) {
+			throw new Error(
+				`Brevo rejected the sender "${senderEmail}": ${detail}. Verify this address under Settings -> Senders & IP in Brevo before using it.`
+			);
+		}
+		throw new Error(`Brevo returned ${response.status}: ${detail}`);
+	}
+
+	// Mirror nodemailer's shape so existing callers that read `.response` or
+	// `.messageId` keep working.
+	return {
+		messageId: payload.messageId,
+		response: `Brevo accepted the message (id ${payload.messageId})`,
+		provider: "brevo",
+	};
+};
 
 // ---------------------------------------------------------------- Resend (HTTP)
 
@@ -188,19 +265,28 @@ const sendViaSmtp = async (email, title, body) => {
 // --- Original swallowed every error and returned undefined, so callers that
 //     read `info.response` crashed with a TypeError and reported a misleading
 //     failure. Errors now propagate and each caller decides. ---
+const activeProvider = () => {
+	if (usingBrevo()) return "brevo";
+	if (usingResend()) return "resend";
+	return "smtp";
+};
+
 const mailSender = async (email, title, body) => {
 	if (!email) {
 		throw new Error("No recipient address was supplied");
 	}
 
 	try {
-		return usingResend()
-			? await sendViaResend(email, title, body)
-			: await sendViaSmtp(email, title, body);
+		switch (activeProvider()) {
+			case "brevo":
+				return await sendViaBrevo(email, title, body);
+			case "resend":
+				return await sendViaResend(email, title, body);
+			default:
+				return await sendViaSmtp(email, title, body);
+		}
 	} catch (error) {
-		console.error(
-			`[mailSender] ${usingResend() ? "resend" : "smtp"}: ${error.message}`
-		);
+		console.error(`[mailSender] ${activeProvider()}: ${error.message}`);
 		throw error;
 	}
 };
