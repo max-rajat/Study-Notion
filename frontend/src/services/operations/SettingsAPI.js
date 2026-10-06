@@ -84,7 +84,13 @@ export async function changePassword(token, formData) {
     toast.success("Password Changed Successfully")
   } catch (error) {
     console.log("CHANGE_PASSWORD_API API ERROR............", error)
-    toast.error(error.response.data.message)
+    // --- Original read error.response.data.message directly, which threw a
+    //     TypeError on a network/CORS failure (no `response` at all). ---
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Could Not Change Password"
+    )
   }
   toast.dismiss(toastId)
 }

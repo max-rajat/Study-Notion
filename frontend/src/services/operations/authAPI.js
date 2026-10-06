@@ -79,7 +79,9 @@ export function signUp(
       navigate("/login")
     } catch (error) {
       console.log("SIGNUP API ERROR............", error)
-      toast.error("Signup Failed")
+      toast.error(
+        error?.response?.data?.message || error?.message || "Signup Failed"
+      )
       navigate("/signup")
     }
     dispatch(setLoading(false))
@@ -115,7 +117,9 @@ export function login(email, password, navigate) {
       navigate("/dashboard/my-profile")
     } catch (error) {
       console.log("LOGIN API ERROR............", error)
-      toast.error("Login Failed")
+      toast.error(
+        error?.response?.data?.message || error?.message || "Login Failed"
+      )
     }
     dispatch(setLoading(false))
     toast.dismiss(toastId)
@@ -153,7 +157,11 @@ export function getPasswordResetToken(email , setEmailSent) {
     }
     catch(error) {
       console.log("RESET PASSWORD TOKEN Error", error);
-      toast.error("Failed to send email for resetting password");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to send email for resetting password"
+      );
     }
     dispatch(setLoading(false));
   }
@@ -176,7 +184,11 @@ export function resetPassword(password, confirmPassword, token) {
     }
     catch(error) {
       console.log("RESET PASSWORD TOKEN Error", error);
-      toast.error("Unable to reset password");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Unable to reset password"
+      );
     }
     dispatch(setLoading(false));
   }

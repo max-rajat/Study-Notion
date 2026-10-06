@@ -1,4 +1,4 @@
-const { Mongoose } = require("mongoose");
+const mongoose = require("mongoose");
 const Category = require("../models/Category");
 function getRandomInt(max) {
     return Math.floor(Math.random() * max)
@@ -16,7 +16,6 @@ exports.createCategory = async (req, res) => {
 			name: name,
 			description: description,
 		});
-		console.log(CategorysDetails);
 		return res.status(200).json({
 			success: true,
 			message: "Categorys Created Successfully",
@@ -88,7 +87,6 @@ exports.deleteCategory = async (req, res) => {
 
 exports.showAllCategories = async (req, res) => {
 	try {
-        console.log("INSIDE SHOW ALL CATEGORIES");
 		const allCategorys = await Category.find({});
 		res.status(200).json({
 			success: true,
@@ -107,7 +105,11 @@ exports.showAllCategories = async (req, res) => {
 exports.categoryPageDetails = async (req, res) => {
     try {
       const { categoryId } = req.body
-      console.log("PRINTING CATEGORY ID: ", categoryId);
+      if (!categoryId || !mongoose.Types.ObjectId.isValid(categoryId)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "A valid category id is required" })
+      }
       // Get courses for the specified category
       const selectedCategory = await Category.findById(categoryId)
         .populate({
@@ -154,8 +156,15 @@ exports.categoryPageDetails = async (req, res) => {
         })
         .exec()
       const allCourses = allCategories.flatMap((category) => category.courses)
+      // --- Original sorted by `b.sold - a.sold`, but Course has no `sold`
+      //     field, so every comparison was NaN and the order was arbitrary.
+      //     Enrollment count is the actual measure of "most selling". ---
       const mostSellingCourses = allCourses
-        .sort((a, b) => b.sold - a.sold)
+        .slice()
+        .sort(
+          (a, b) =>
+            (b.studentsEnrolled?.length || 0) - (a.studentsEnrolled?.length || 0)
+        )
         .slice(0, 10)
        // console.log("mostSellingCourses COURSE", mostSellingCourses)
       res.status(200).json({

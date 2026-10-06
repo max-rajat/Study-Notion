@@ -9,31 +9,44 @@ const { convertSecondsToDuration } = require("../utils/secToDuration")
 // Method for updating a profile
 exports.updateProfile = async (req, res) => {
   try {
-    const {
-      firstName = "",
-      lastName = "",
-      dateOfBirth = "",
-      about = "",
-      contactNumber = "",
-      gender = "",
-    } = req.body
+    // --- Original defaulted every field to "", so a request that omitted
+    //     firstName/lastName blanked the user's name. Only touch what was
+    //     actually sent. ---
+    const { firstName, lastName, dateOfBirth, about, contactNumber, gender } =
+      req.body
     const id = req.user.id
 
     // Find the profile by id
     const userDetails = await User.findById(id)
+    if (!userDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
     const profile = await Profile.findById(userDetails.additionalDetails)
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found",
+      })
+    }
 
-    const user = await User.findByIdAndUpdate(id, {
-      firstName,
-      lastName,
-    })
-    await user.save()
+    // --- Original called findByIdAndUpdate (which returns the pre-update doc)
+    //     and then .save() on it, which did nothing. ---
+    if (firstName !== undefined && firstName !== "") {
+      userDetails.firstName = firstName
+    }
+    if (lastName !== undefined && lastName !== "") {
+      userDetails.lastName = lastName
+    }
+    await userDetails.save()
 
-    // Update the profile fields
-    profile.dateOfBirth = dateOfBirth
-    profile.about = about
-    profile.contactNumber = contactNumber
-    profile.gender = gender
+    // Update the profile fields that were supplied
+    if (dateOfBirth !== undefined) profile.dateOfBirth = dateOfBirth
+    if (about !== undefined) profile.about = about
+    if (contactNumber !== undefined) profile.contactNumber = contactNumber
+    if (gender !== undefined) profile.gender = gender
 
     // Save the updated profile
     await profile.save()
@@ -60,7 +73,6 @@ exports.updateProfile = async (req, res) => {
 exports.deleteAccount = async (req, res) => {
   try {
     const id = req.user.id
-    console.log(id)
     const user = await User.findById({ _id: id })
     if (!user) {
       return res.status(404).json({
@@ -79,13 +91,15 @@ exports.deleteAccount = async (req, res) => {
         { new: true }
       )
     }
+    // --- Original deleted course progress *after* sending the response. ---
+    await CourseProgress.deleteMany({ userId: id })
+
     // Now Delete User
     await User.findByIdAndDelete({ _id: id })
     res.status(200).json({
       success: true,
       message: "User deleted successfully",
     })
-    await CourseProgress.deleteMany({ userId: id })
   } catch (error) {
     console.log(error)
     res
@@ -97,10 +111,18 @@ exports.deleteAccount = async (req, res) => {
 exports.getAllUserDetails = async (req, res) => {
   try {
     const id = req.user.id
+    // --- Original selected every field, so the response carried the bcrypt
+    //     password hash and the stored token back to the client. ---
     const userDetails = await User.findById(id)
+      .select("-password -token -resetPasswordExpires")
       .populate("additionalDetails")
       .exec()
-    console.log(userDetails)
+    if (!userDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      })
+    }
     res.status(200).json({
       success: true,
       message: "User Data fetched successfully",
@@ -116,15 +138,22 @@ exports.getAllUserDetails = async (req, res) => {
 
 exports.updateDisplayPicture = async (req, res) => {
   try {
-    const displayPicture = req.files.displayPicture
+    const displayPicture = req.files?.displayPicture
+    if (!displayPicture) {
+      return res.status(400).json({
+        success: false,
+        message: "No image file was uploaded",
+      })
+    }
     const userId = req.user.id
+    // --- Original passed 1000 as the `quality` argument; Cloudinary expects
+    //     1-100 (or "auto"), so the upload was rejected. ---
     const image = await uploadImageToCloudinary(
       displayPicture,
       process.env.FOLDER_NAME,
       1000,
-      1000
+      "auto"
     )
-    console.log(image)
     const updatedProfile = await User.findByIdAndUpdate(
       { _id: userId },
       { image: image.secure_url },
@@ -159,6 +188,13 @@ exports.getEnrolledCourses = async (req, res) => {
         },
       })
       .exec()
+    // --- Original dereferenced userDetails before the null check below. ---
+    if (!userDetails) {
+      return res.status(400).json({
+        success: false,
+        message: `Could not find user with id: ${userId}`,
+      })
+    }
     userDetails = userDetails.toObject()
     var SubsectionLength = 0
     for (var i = 0; i < userDetails.courses.length; i++) {
@@ -167,7 +203,11 @@ exports.getEnrolledCourses = async (req, res) => {
       for (var j = 0; j < userDetails.courses[i].courseContent.length; j++) {
         totalDurationInSeconds += userDetails.courses[i].courseContent[
           j
-        ].subSection.reduce((acc, curr) => acc + parseInt(curr.timeDuration), 0)
+        ].subSection.reduce((acc, curr) => {
+          // timeDuration is a string and may be empty or non-numeric.
+          const seconds = parseInt(curr.timeDuration, 10)
+          return acc + (Number.isNaN(seconds) ? 0 : seconds)
+        }, 0)
         userDetails.courses[i].totalDuration = convertSecondsToDuration(
           totalDurationInSeconds
         )
@@ -178,7 +218,9 @@ exports.getEnrolledCourses = async (req, res) => {
         courseID: userDetails.courses[i]._id,
         userId: userId,
       })
-      courseProgressCount = courseProgressCount?.completedVideos.length
+      // --- Original left this undefined when no progress document existed,
+      //     making progressPercentage NaN and breaking the progress bar. ---
+      courseProgressCount = courseProgressCount?.completedVideos?.length ?? 0
       if (SubsectionLength === 0) {
         userDetails.courses[i].progressPercentage = 100
       } else {
@@ -191,12 +233,6 @@ exports.getEnrolledCourses = async (req, res) => {
       }
     }
 
-    if (!userDetails) {
-      return res.status(400).json({
-        success: false,
-        message: `Could not find user with id: ${userDetails}`,
-      })
-    }
     return res.status(200).json({
       success: true,
       data: userDetails.courses,

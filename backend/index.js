@@ -1,3 +1,8 @@
+// dotenv has to run before any module that reads process.env at require time
+// (config/razorpay builds its client immediately, config/database reads the URL).
+const dotenv = require("dotenv");
+dotenv.config();
+
 const express = require("express");
 const app = express();
 
@@ -12,10 +17,19 @@ const cookieParser = require("cookie-parser");
 
 const {cloudinaryConnect } = require("./config/cloudinary");
 const fileUpload = require("express-fileupload");
-const dotenv = require("dotenv");
+const os = require("os");
 
-dotenv.config();
 const PORT = process.env.PORT || 4000;
+
+// Fail fast on missing configuration rather than erroring on the first request.
+const REQUIRED_ENV = ["MONGODB_URL", "JWT_SECRET"];
+const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key]);
+if (missingEnv.length > 0) {
+	console.error(
+		`Missing required environment variable(s): ${missingEnv.join(", ")}`
+	);
+	process.exit(1);
+}
 
 //database connect
 database.connect();
@@ -56,7 +70,10 @@ app.options("*", cors());
 app.use(
 	fileUpload({
 		useTempFiles:true,
-		tempFileDir:"/tmp",
+		// --- Original hardcoded "/tmp", which doesn't exist on Windows. ---
+		tempFileDir: os.tmpdir(),
+		limits: { fileSize: 100 * 1024 * 1024 },
+		abortOnLimit: true,
 	})
 )
 //cloudinary connection
@@ -79,7 +96,57 @@ app.get("/", (req, res) => {
 	});
 });
 
-app.listen(PORT, () => {
+// Unknown routes should be a JSON 404, matching the rest of the API.
+app.use((req, res) => {
+	return res.status(404).json({
+		success: false,
+		message: `Route not found: ${req.method} ${req.originalUrl}`,
+	});
+});
+
+// Catch-all error handler. Without this, a throw in any handler returned
+// Express's default HTML error page (with a stack trace in development).
+app.use((error, req, res, next) => {
+	if (error && error.message === "Not allowed by CORS") {
+		return res.status(403).json({ success: false, message: "Origin not allowed" });
+	}
+	console.error("Unhandled error:", error);
+	if (res.headersSent) {
+		return next(error);
+	}
+	return res.status(500).json({
+		success: false,
+		message: "Internal server error",
+	});
+});
+
+const server = app.listen(PORT, () => {
 	console.log(`App is running at ${PORT}`)
+})
+
+// Without a listener for this, a failed bind surfaces as an unhandled 'error'
+// event: a bare stack trace that doesn't say what actually went wrong. The
+// common case by far is a previous instance still holding the port.
+server.on("error", (error) => {
+	if (error.code === "EADDRINUSE") {
+		console.error(
+			`
+Port ${PORT} is already in use — another instance is probably still running.
+` +
+				`Stop it, or start this one on a different port with PORT=<other> npm run dev.
+` +
+				`  Windows: Get-NetTCPConnection -LocalPort ${PORT} -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+` +
+				`  macOS/Linux: lsof -ti :${PORT} | xargs kill
+`
+		)
+	} else if (error.code === "EACCES") {
+		console.error(`
+Not permitted to bind port ${PORT}. Try a port above 1024.
+`)
+	} else {
+		console.error("Server failed to start:", error)
+	}
+	process.exit(1)
 })
 

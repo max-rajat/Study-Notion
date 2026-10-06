@@ -1,29 +1,58 @@
 // Import necessary modules
 const Section = require("../models/Section")
 const SubSection = require("../models/SubSection")
+const Course = require("../models/Course")
 const { uploadImageToCloudinary } = require("../utils/imageUploader")
+
+// These routes sit behind `isInstructor`, which only proves the caller is *an*
+// instructor. A section has no back-reference to its course, so ownership is
+// established by finding the course that contains it.
+const assertOwnsSection = async (sectionId, userId) => {
+  if (!sectionId) {
+    return { ok: false, status: 400, message: "sectionId is required" }
+  }
+  const course = await Course.findOne({ courseContent: sectionId })
+  if (!course) {
+    return { ok: false, status: 404, message: "Section not found" }
+  }
+  if (course.instructor.toString() !== userId) {
+    return {
+      ok: false,
+      status: 403,
+      message: "You are not the instructor of this course",
+    }
+  }
+  return { ok: true, course }
+}
 
 // Create a new sub-section for a given section
 exports.createSubSection = async (req, res) => {
   try {
     // Extract necessary information from the request body
     const { sectionId, title, description } = req.body
-    const video = req.files.video
+    // --- Original: req.files.video threw a TypeError when the request had no
+    //     multipart body. ---
+    const video = req.files?.video
 
     // Check if all necessary fields are provided
     if (!sectionId || !title || !description || !video) {
       return res
-        .status(404)
+        .status(400)
         .json({ success: false, message: "All Fields are Required" })
     }
-    console.log(video)
+
+    const ownership = await assertOwnsSection(sectionId, req.user.id)
+    if (!ownership.ok) {
+      return res
+        .status(ownership.status)
+        .json({ success: false, message: ownership.message })
+    }
 
     // Upload the video file to Cloudinary
     const uploadDetails = await uploadImageToCloudinary(
       video,
       process.env.FOLDER_NAME
     )
-    console.log(uploadDetails)
     // Create a new sub-section with the necessary information
     const SubSectionDetails = await SubSection.create({
       title: title,
@@ -55,6 +84,14 @@ exports.createSubSection = async (req, res) => {
 exports.updateSubSection = async (req, res) => {
   try {
     const { sectionId, subSectionId, title, description } = req.body
+
+    const ownership = await assertOwnsSection(sectionId, req.user.id)
+    if (!ownership.ok) {
+      return res
+        .status(ownership.status)
+        .json({ success: false, message: ownership.message })
+    }
+
     const subSection = await SubSection.findById(subSectionId)
 
     if (!subSection) {
@@ -88,8 +125,6 @@ exports.updateSubSection = async (req, res) => {
       "subSection"
     )
 
-    console.log("updated section", updatedSection)
-
     return res.json({
       success: true,
       message: "Section updated successfully",
@@ -107,6 +142,14 @@ exports.updateSubSection = async (req, res) => {
 exports.deleteSubSection = async (req, res) => {
   try {
     const { subSectionId, sectionId } = req.body
+
+    const ownership = await assertOwnsSection(sectionId, req.user.id)
+    if (!ownership.ok) {
+      return res
+        .status(ownership.status)
+        .json({ success: false, message: ownership.message })
+    }
+
     await Section.findByIdAndUpdate(
       { _id: sectionId },
       {

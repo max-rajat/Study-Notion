@@ -15,7 +15,9 @@ exports.resetPasswordToken = async (req, res) => {
 		}
 		const token = crypto.randomBytes(20).toString("hex");
 
-		const updatedDetails = await User.findOneAndUpdate(
+		// --- Original logged the full updated user document here, which
+		//     includes the live reset token. Never log reset credentials. ---
+		await User.findOneAndUpdate(
 			{ email: email },
 			{
 				token: token,
@@ -23,9 +25,13 @@ exports.resetPasswordToken = async (req, res) => {
 			},
 			{ new: true }
 		);
-		console.log("DETAILS", updatedDetails);
 
-		const url = `http://localhost:3000/update-password/${token}`;
+		// --- Original hardcoded http://localhost:3000, so reset links emailed
+		//     from a deployed server pointed at the recipient's own machine. ---
+		const frontendUrl = (
+			process.env.FRONTEND_URL || "http://localhost:3000"
+		).replace(/\/$/, "");
+		const url = `${frontendUrl}/update-password/${token}`;
 
 		await mailSender(
 			email,
@@ -51,6 +57,13 @@ exports.resetPassword = async (req, res) => {
 	try {
 		const { password, confirmPassword, token } = req.body;
 
+		if (!password || !confirmPassword || !token) {
+			return res.status(400).json({
+				success: false,
+				message: "Password, Confirm Password and token are all required",
+			});
+		}
+
 		if (confirmPassword !== password) {
 			return res.json({
 				success: false,
@@ -71,9 +84,14 @@ exports.resetPassword = async (req, res) => {
 			});
 		}
 		const encryptedPassword = await bcrypt.hash(password, 10);
+		// --- Original left the reset token in place, so the same link could be
+		//     replayed to change the password again until it expired. Clear it. ---
 		await User.findOneAndUpdate(
 			{ token: token },
-			{ password: encryptedPassword },
+			{
+				password: encryptedPassword,
+				$unset: { token: "", resetPasswordExpires: "" },
+			},
 			{ new: true }
 		);
 		res.json({

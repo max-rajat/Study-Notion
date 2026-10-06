@@ -5,6 +5,7 @@ const SubSection = require("../models/SubSection")
 const User = require("../models/User")
 const { uploadImageToCloudinary } = require("../utils/imageUploader")
 const CourseProgress = require("../models/CourseProgress")
+const RatingAndReview = require("../models/RatingAndRaview")
 const { convertSecondsToDuration } = require("../utils/secToDuration")
 // Function to create a new course
 exports.createCourse = async (req, res) => {
@@ -23,15 +24,36 @@ exports.createCourse = async (req, res) => {
       status,
       instructions: _instructions,
     } = req.body
-    // Get thumbnail image from request files
-    const thumbnail = req.files.thumbnailImage
+    // Get thumbnail image from request files.
+    // req.files is null when the request carries no multipart body, so guard it
+    // instead of letting the property access throw a TypeError.
+    const thumbnail = req.files?.thumbnailImage
+    if (!thumbnail) {
+      return res.status(400).json({
+        success: false,
+        message: "Course thumbnail is required",
+      })
+    }
 
-    // Convert the tag and instructions from stringified Array to Array
-    const tag = JSON.parse(_tag)
-    const instructions = JSON.parse(_instructions)
-
-    console.log("tag", tag)
-    console.log("instructions", instructions)
+    // Convert the tag and instructions from stringified Array to Array.
+    // Malformed JSON from the client must be a 400, not an unhandled throw.
+    let tag
+    let instructions
+    try {
+      tag = JSON.parse(_tag)
+      instructions = JSON.parse(_instructions)
+    } catch (parseError) {
+      return res.status(400).json({
+        success: false,
+        message: "tag and instructions must be valid JSON arrays",
+      })
+    }
+    if (!Array.isArray(tag) || !Array.isArray(instructions)) {
+      return res.status(400).json({
+        success: false,
+        message: "tag and instructions must be arrays",
+      })
+    }
 
     // Check if any of the required fields are missing
     if (
@@ -52,12 +74,13 @@ exports.createCourse = async (req, res) => {
     if (!status || status === undefined) {
       status = "Draft"
     }
-    // Check if the user is an instructor
-    const instructorDetails = await User.findById(userId, {
-      accountType: "Instructor",
-    })
+    // Check if the user is an instructor.
+    // --- Original: User.findById(userId, { accountType: "Instructor" }) — the
+    //     second argument is a projection, not a filter, so this never verified
+    //     the account type. Load the user and check the field explicitly. ---
+    const instructorDetails = await User.findById(userId)
 
-    if (!instructorDetails) {
+    if (!instructorDetails || instructorDetails.accountType !== "Instructor") {
       return res.status(404).json({
         success: false,
         message: "Instructor Details Not Found",
@@ -77,7 +100,6 @@ exports.createCourse = async (req, res) => {
       thumbnail,
       process.env.FOLDER_NAME
     )
-    console.log(thumbnailImage)
     // Create a new course with the given details
     const newCourse = await Course.create({
       courseName,
@@ -105,7 +127,7 @@ exports.createCourse = async (req, res) => {
       { new: true }
     )
     // Add the new course to the Categories
-    const categoryDetails2 = await Category.findByIdAndUpdate(
+    await Category.findByIdAndUpdate(
       { _id: category },
       {
         $push: {
@@ -114,7 +136,6 @@ exports.createCourse = async (req, res) => {
       },
       { new: true }
     )
-    console.log("HEREEEEEEEE", categoryDetails2)
     // Return the new course and a success message
     res.status(200).json({
       success: true,
@@ -142,9 +163,17 @@ exports.editCourse = async (req, res) => {
       return res.status(404).json({ error: "Course not found" })
     }
 
+    // Only the owning instructor may edit the course. Without this check any
+    // logged-in instructor could edit anyone else's course.
+    if (course.instructor.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not the instructor of this course",
+      })
+    }
+
     // If Thumbnail Image is found, update it
-    if (req.files) {
-      console.log("thumbnail update")
+    if (req.files?.thumbnailImage) {
       const thumbnail = req.files.thumbnailImage
       const thumbnailImage = await uploadImageToCloudinary(
         thumbnail,
@@ -153,13 +182,62 @@ exports.editCourse = async (req, res) => {
       course.thumbnail = thumbnailImage.secure_url
     }
 
-    // Update only the fields that are present in the request body
-    for (const key in updates) {
-      if (updates.hasOwnProperty(key)) {
-        if (key === "tag" || key === "instructions") {
-          course[key] = JSON.parse(updates[key])
-        } else {
-          course[key] = updates[key]
+    // Update only the fields the client is allowed to change.
+    // --- Original: looped over every key in req.body and assigned it onto the
+    //     document, so a crafted request could overwrite instructor,
+    //     studentsEnrolled, ratingAndReviews or courseContent. ---
+    const EDITABLE_FIELDS = [
+      "courseName",
+      "courseDescription",
+      "whatYouWillLearn",
+      "price",
+      "category",
+      "status",
+    ]
+    const JSON_ARRAY_FIELDS = ["tag", "instructions"]
+
+    const previousCategoryId = course.category ? course.category.toString() : null
+
+    for (const key of EDITABLE_FIELDS) {
+      if (updates[key] !== undefined) {
+        course[key] = updates[key]
+      }
+    }
+
+    // Moving a course between categories has to update both Category.courses
+    // arrays, otherwise the catalog page keeps listing it under the old one.
+    const newCategoryId = course.category ? course.category.toString() : null
+    if (newCategoryId && newCategoryId !== previousCategoryId) {
+      const newCategory = await Category.findById(newCategoryId)
+      if (!newCategory) {
+        return res.status(404).json({
+          success: false,
+          message: "Category Details Not Found",
+        })
+      }
+      if (previousCategoryId) {
+        await Category.findByIdAndUpdate(previousCategoryId, {
+          $pull: { courses: course._id },
+        })
+      }
+      await Category.findByIdAndUpdate(newCategoryId, {
+        $addToSet: { courses: course._id },
+      })
+    }
+
+    for (const key of JSON_ARRAY_FIELDS) {
+      if (updates[key] !== undefined) {
+        try {
+          const parsed = JSON.parse(updates[key])
+          if (!Array.isArray(parsed)) {
+            throw new Error("not an array")
+          }
+          course[key] = parsed
+        } catch (parseError) {
+          return res.status(400).json({
+            success: false,
+            message: `${key} must be a valid JSON array`,
+          })
         }
       }
     }
@@ -321,8 +399,12 @@ exports.getCourseDetails = async (req, res) => {
     let totalDurationInSeconds = 0
     courseDetails.courseContent.forEach((content) => {
       content.subSection.forEach((subSection) => {
-        const timeDurationInSeconds = parseInt(subSection.timeDuration)
-        totalDurationInSeconds += timeDurationInSeconds
+        // timeDuration is a string and can be empty or non-numeric; a single
+        // NaN would otherwise poison the whole total.
+        const timeDurationInSeconds = parseInt(subSection.timeDuration, 10)
+        totalDurationInSeconds += Number.isNaN(timeDurationInSeconds)
+          ? 0
+          : timeDurationInSeconds
       })
     })
 
@@ -365,19 +447,36 @@ exports.getFullCourseDetails = async (req, res) => {
       })
       .exec()
 
-    let courseProgressCount = await CourseProgress.findOne({
-      courseID: courseId,
-      userId: userId,
-    })
-
-    console.log("courseProgressCount : ", courseProgressCount)
-
     if (!courseDetails) {
       return res.status(400).json({
         success: false,
         message: `Could not find course with id: ${courseId}`,
       })
     }
+
+    // This response includes every subsection's videoUrl, so it must be
+    // restricted to people entitled to the content: an enrolled student, the
+    // owning instructor (who edits the course here), or an admin.
+    // --- Original: any authenticated user could fetch the video URLs for any
+    //     course, bypassing the paywall. ---
+    const isOwningInstructor =
+      courseDetails.instructor?._id?.toString() === userId
+    const isEnrolled = courseDetails.studentsEnrolled.some(
+      (studentId) => studentId.toString() === userId
+    )
+    const isAdmin = req.user.accountType === "Admin"
+
+    if (!isOwningInstructor && !isEnrolled && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not enrolled in this course",
+      })
+    }
+
+    let courseProgressCount = await CourseProgress.findOne({
+      courseID: courseId,
+      userId: userId,
+    })
 
     // if (courseDetails.status === "Draft") {
     //   return res.status(403).json({
@@ -389,8 +488,12 @@ exports.getFullCourseDetails = async (req, res) => {
     let totalDurationInSeconds = 0
     courseDetails.courseContent.forEach((content) => {
       content.subSection.forEach((subSection) => {
-        const timeDurationInSeconds = parseInt(subSection.timeDuration)
-        totalDurationInSeconds += timeDurationInSeconds
+        // timeDuration is a string and can be empty or non-numeric; a single
+        // NaN would otherwise poison the whole total.
+        const timeDurationInSeconds = parseInt(subSection.timeDuration, 10)
+        totalDurationInSeconds += Number.isNaN(timeDurationInSeconds)
+          ? 0
+          : timeDurationInSeconds
       })
     })
 
@@ -444,10 +547,24 @@ exports.deleteCourse = async (req, res) => {
   try {
     const { courseId } = req.body
 
+    if (!courseId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Course id is required" })
+    }
+
     // Find the course
     const course = await Course.findById(courseId)
     if (!course) {
       return res.status(404).json({ message: "Course not found" })
+    }
+
+    // Only the owning instructor may delete the course.
+    if (course.instructor.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not the instructor of this course",
+      })
     }
 
     // Unenroll students from the course
@@ -473,6 +590,20 @@ exports.deleteCourse = async (req, res) => {
       // Delete the section
       await Section.findByIdAndDelete(sectionId)
     }
+
+    // Drop the course from its category and from the instructor's own list,
+    // and clear the dependent records. Without this the catalog page and the
+    // instructor dashboard keep referencing a course that no longer exists.
+    if (course.category) {
+      await Category.findByIdAndUpdate(course.category, {
+        $pull: { courses: courseId },
+      })
+    }
+    await User.findByIdAndUpdate(course.instructor, {
+      $pull: { courses: courseId },
+    })
+    await RatingAndReview.deleteMany({ course: courseId })
+    await CourseProgress.deleteMany({ courseID: courseId })
 
     // Delete the course
     await Course.findByIdAndDelete(courseId)

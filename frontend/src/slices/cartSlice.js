@@ -1,16 +1,27 @@
 import { createSlice } from "@reduxjs/toolkit"
 import { toast } from "react-hot-toast"
 
+// Corrupted or hand-edited localStorage would make JSON.parse throw while this
+// module was still being evaluated, which takes down the whole app before it
+// renders. Parse defensively and fall back to an empty cart.
+const readStored = (key, fallback) => {
+  const raw = localStorage.getItem(key)
+  if (raw === null) return fallback
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed === null || parsed === undefined ? fallback : parsed
+  } catch (e) {
+    localStorage.removeItem(key)
+    return fallback
+  }
+}
+
+const storedCart = readStored("cart", [])
+
 const initialState = {
-  cart: localStorage.getItem("cart")
-    ? JSON.parse(localStorage.getItem("cart"))
-    : [],
-  total: localStorage.getItem("total")
-    ? JSON.parse(localStorage.getItem("total"))
-    : 0,
-  totalItems: localStorage.getItem("totalItems")
-    ? JSON.parse(localStorage.getItem("totalItems"))
-    : 0,
+  cart: Array.isArray(storedCart) ? storedCart : [],
+  total: Number(readStored("total", 0)) || 0,
+  totalItems: Number(readStored("totalItems", 0)) || 0,
 }
 
 const cartSlice = createSlice({

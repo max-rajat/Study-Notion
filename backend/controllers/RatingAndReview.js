@@ -10,6 +10,20 @@ exports.createRating = async (req, res) => {
         const userId = req.user.id;
         //fetchdata from req body
         const {rating, review, courseId} = req.body;
+
+        const numericRating = Number(rating);
+        if (
+            !courseId ||
+            !review ||
+            !Number.isFinite(numericRating) ||
+            numericRating < 1 ||
+            numericRating > 5
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "A review and a rating between 1 and 5 are required",
+            });
+        }
         //check if user is enrolled or not
         const courseDetails = await Course.findOne(
                                     {_id:courseId,
@@ -35,20 +49,19 @@ exports.createRating = async (req, res) => {
                 }
         //create rating and review
         const ratingReview = await RatingAndReview.create({
-                                        rating, review, 
+                                        rating: numericRating, review, 
                                         course:courseId,
                                         user:userId,
                                     });
        
         //update course with this rating/review
-        const updatedCourseDetails = await Course.findByIdAndUpdate({_id:courseId},
+        await Course.findByIdAndUpdate({_id:courseId},
                                     {
                                         $push: {
                                             ratingAndReviews: ratingReview._id,
                                         }
                                     },
                                     {new: true});
-        console.log(updatedCourseDetails);
         //return response
         return res.status(200).json({
             success:true,
@@ -71,7 +84,15 @@ exports.createRating = async (req, res) => {
 exports.getAverageRating = async (req, res) => {
     try {
             //get course ID
-            const courseId = req.body.courseId;
+            // --- Original read only req.body, but this is a GET route, so the
+            //     id arrives as a query parameter. Accept either. ---
+            const courseId = req.query.courseId || req.body?.courseId;
+            if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "A valid courseId is required",
+                });
+            }
             //calculate avg rating
 
             const result = await RatingAndReview.aggregate([

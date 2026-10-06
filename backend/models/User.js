@@ -15,11 +15,15 @@ const userSchema = new mongoose.Schema(
 			required: true,
 			trim: true,
 		},
-		// Define the email field with type String, required, and trimmed
+		// Define the email field with type String, required, and trimmed.
+		// `unique` adds the index that stops two accounts sharing an address,
+		// and `lowercase` makes lookups case-insensitive.
 		email: {
 			type: String,
 			required: true,
 			trim: true,
+			unique: true,
+			lowercase: true,
 		},
 
 		// Define the password field with type String and required
@@ -27,7 +31,7 @@ const userSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 		},
-		// Define the role field with type String and enum values of "Admin", "Student", or "Visitor"
+		// Account role. Note the enum below is the authoritative list.
 		accountType: {
 			type: String,
 			enum: ["Admin", "Student", "Instructor"],

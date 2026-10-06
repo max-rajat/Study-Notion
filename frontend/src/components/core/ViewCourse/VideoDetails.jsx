@@ -48,113 +48,92 @@ const VideoDetails = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseSectionData, courseEntireData, location.pathname])
 
-  // check if the lecture is the first video of the course
-  const isFirstVideo = () => {
-    const currentSectionIndx = courseSectionData.findIndex(
+  // Resolve the current position in the course, or null when the URL points at
+  // a section/subsection that isn't part of the loaded data.
+  const getCurrentPosition = () => {
+    const sectionIndx = courseSectionData.findIndex(
       (data) => data._id === sectionId
     )
+    if (sectionIndx === -1) return null
 
-    const currentSubSectionIndx = courseSectionData[
-      currentSectionIndx
-    ].subSection.findIndex((data) => data._id === subSectionId)
+    const subSections = courseSectionData[sectionIndx].subSection || []
+    const subSectionIndx = subSections.findIndex(
+      (data) => data._id === subSectionId
+    )
+    if (subSectionIndx === -1) return null
 
-    if (currentSectionIndx === 0 && currentSubSectionIndx === 0) {
-      return true
-    } else {
-      return false
-    }
+    return { sectionIndx, subSectionIndx, subSections }
+  }
+
+  // check if the lecture is the first video of the course
+  const isFirstVideo = () => {
+    const position = getCurrentPosition()
+    if (!position) return true
+    return position.sectionIndx === 0 && position.subSectionIndx === 0
   }
 
   // go to the next video
   const goToNextVideo = () => {
-    // console.log(courseSectionData)
+    const position = getCurrentPosition()
+    if (!position) return
 
-    const currentSectionIndx = courseSectionData.findIndex(
-      (data) => data._id === sectionId
-    )
+    const { sectionIndx, subSectionIndx, subSections } = position
 
-    const noOfSubsections =
-      courseSectionData[currentSectionIndx].subSection.length
-
-    const currentSubSectionIndx = courseSectionData[
-      currentSectionIndx
-    ].subSection.findIndex((data) => data._id === subSectionId)
-
-    // console.log("no of subsections", noOfSubsections)
-
-    if (currentSubSectionIndx !== noOfSubsections - 1) {
-      const nextSubSectionId =
-        courseSectionData[currentSectionIndx].subSection[
-          currentSubSectionIndx + 1
-        ]._id
+    if (subSectionIndx !== subSections.length - 1) {
+      const nextSubSectionId = subSections[subSectionIndx + 1]._id
       navigate(
         `/view-course/${courseId}/section/${sectionId}/sub-section/${nextSubSectionId}`
       )
-    } else {
-      const nextSectionId = courseSectionData[currentSectionIndx + 1]._id
-      const nextSubSectionId =
-        courseSectionData[currentSectionIndx + 1].subSection[0]._id
-      navigate(
-        `/view-course/${courseId}/section/${nextSectionId}/sub-section/${nextSubSectionId}`
-      )
+      return
     }
+
+    // Move into the next section, skipping any that have no lectures.
+    const nextSection = courseSectionData
+      .slice(sectionIndx + 1)
+      .find((sec) => sec.subSection?.length > 0)
+    if (!nextSection) return
+
+    navigate(
+      `/view-course/${courseId}/section/${nextSection._id}/sub-section/${nextSection.subSection[0]._id}`
+    )
   }
 
   // check if the lecture is the last video of the course
   const isLastVideo = () => {
-    const currentSectionIndx = courseSectionData.findIndex(
-      (data) => data._id === sectionId
+    const position = getCurrentPosition()
+    if (!position) return true
+    return (
+      position.sectionIndx === courseSectionData.length - 1 &&
+      position.subSectionIndx === position.subSections.length - 1
     )
-
-    const noOfSubsections =
-      courseSectionData[currentSectionIndx].subSection.length
-
-    const currentSubSectionIndx = courseSectionData[
-      currentSectionIndx
-    ].subSection.findIndex((data) => data._id === subSectionId)
-
-    if (
-      currentSectionIndx === courseSectionData.length - 1 &&
-      currentSubSectionIndx === noOfSubsections - 1
-    ) {
-      return true
-    } else {
-      return false
-    }
   }
 
   // go to the previous video
   const goToPrevVideo = () => {
-    // console.log(courseSectionData)
+    const position = getCurrentPosition()
+    if (!position) return
 
-    const currentSectionIndx = courseSectionData.findIndex(
-      (data) => data._id === sectionId
-    )
+    const { sectionIndx, subSectionIndx, subSections } = position
 
-    const currentSubSectionIndx = courseSectionData[
-      currentSectionIndx
-    ].subSection.findIndex((data) => data._id === subSectionId)
-
-    if (currentSubSectionIndx !== 0) {
-      const prevSubSectionId =
-        courseSectionData[currentSectionIndx].subSection[
-          currentSubSectionIndx - 1
-        ]._id
+    if (subSectionIndx !== 0) {
+      const prevSubSectionId = subSections[subSectionIndx - 1]._id
       navigate(
         `/view-course/${courseId}/section/${sectionId}/sub-section/${prevSubSectionId}`
       )
-    } else {
-      const prevSectionId = courseSectionData[currentSectionIndx - 1]._id
-      const prevSubSectionLength =
-        courseSectionData[currentSectionIndx - 1].subSection.length
-      const prevSubSectionId =
-        courseSectionData[currentSectionIndx - 1].subSection[
-          prevSubSectionLength - 1
-        ]._id
-      navigate(
-        `/view-course/${courseId}/section/${prevSectionId}/sub-section/${prevSubSectionId}`
-      )
+      return
     }
+
+    // Step back to the previous section that actually has lectures.
+    const prevSection = courseSectionData
+      .slice(0, sectionIndx)
+      .reverse()
+      .find((sec) => sec.subSection?.length > 0)
+    if (!prevSection) return
+
+    const prevSubSections = prevSection.subSection
+    navigate(
+      `/view-course/${courseId}/section/${prevSection._id}/sub-section/${prevSubSections[prevSubSections.length - 1]._id}`
+    )
   }
 
   const handleLectureCompletion = async () => {

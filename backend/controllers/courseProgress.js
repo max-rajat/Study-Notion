@@ -9,10 +9,37 @@ exports.updateCourseProgress = async (req, res) => {
   const userId = req.user.id
 
   try {
+    if (!courseId || !subsectionId) {
+      return res
+        .status(400)
+        .json({ error: "courseId and subsectionId are required" })
+    }
+
     // Check if the subsection is valid
     const subsection = await SubSection.findById(subsectionId)
     if (!subsection) {
       return res.status(404).json({ error: "Invalid subsection" })
+    }
+
+    // The subsection has to belong to the course being reported against,
+    // otherwise progress for one course could be written using another's ids.
+    const course = await Course.findOne({
+      _id: courseId,
+      studentsEnrolled: userId,
+    })
+    if (!course) {
+      return res
+        .status(403)
+        .json({ error: "You are not enrolled in this course" })
+    }
+    const sectionOwnsSubsection = await Section.exists({
+      _id: { $in: course.courseContent },
+      subSection: subsectionId,
+    })
+    if (!sectionOwnsSubsection) {
+      return res
+        .status(400)
+        .json({ error: "Subsection does not belong to this course" })
     }
 
     // Find the course progress document for the user and course

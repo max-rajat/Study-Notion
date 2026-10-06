@@ -101,9 +101,15 @@ exports.signup = async (req, res) => {
       image: `https://api.dicebear.com/7.x/initials/svg?seed=${firstName} ${lastName}`,
     })
 
+    // --- Original returned the raw created document, so the response body
+    //     included the bcrypt password hash. Strip it before replying. ---
+    const safeUser = user.toObject()
+    delete safeUser.password
+    delete safeUser.token
+
     return res.status(200).json({
       success: true,
-      user,
+      user: safeUser,
       message: "User registered successfully",
     })
   } catch (error) {
@@ -247,7 +253,13 @@ exports.sendotp = async (req, res) => {
     })
   } catch (error) {
     console.log(error.message)
-    return res.status(500).json({ success: false, error: error.message })
+    // --- Original returned only `error`, but every client reads `message`,
+    //     so the real reason never reached the user. Send both. ---
+    return res.status(500).json({
+      success: false,
+      message: `Could not send the OTP email. ${error.message}`,
+      error: error.message,
+    })
   }
 }
 
@@ -256,9 +268,21 @@ exports.changePassword = async (req, res) => {
   try {
     // Get user data from req.user
     const userDetails = await User.findById(req.user.id)
+    if (!userDetails) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" })
+    }
 
     // Get old password, new password, and confirm new password from req.body
     const { oldPassword, newPassword } = req.body
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Both the current and the new password are required",
+      })
+    }
 
     // Validate old password
     const isPasswordMatch = await bcrypt.compare(
@@ -280,9 +304,13 @@ exports.changePassword = async (req, res) => {
       { new: true }
     )
 
-    // Send notification email
+    // Send notification email.
+    // --- Original returned a 500 here when the email failed, even though the
+    //     password had already been changed — the user was told the change had
+    //     failed when it had actually succeeded. The notification is advisory,
+    //     so log it and carry on. ---
     try {
-      const emailResponse = await mailSender(
+      await mailSender(
         updatedUserDetails.email,
         "Password for your account has been updated",
         passwordUpdated(
@@ -290,15 +318,8 @@ exports.changePassword = async (req, res) => {
           `Password updated successfully for ${updatedUserDetails.firstName} ${updatedUserDetails.lastName}`
         )
       )
-      console.log("Email sent successfully:", emailResponse.response)
     } catch (error) {
-      // If there's an error sending the email, log the error and return a 500 (Internal Server Error) error
-      console.error("Error occurred while sending email:", error)
-      return res.status(500).json({
-        success: false,
-        message: "Error occurred while sending email",
-        error: error.message,
-      })
+      console.error("Password-change notification email failed:", error.message)
     }
 
     // Return success response

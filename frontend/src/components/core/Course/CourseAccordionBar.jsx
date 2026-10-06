@@ -10,10 +10,15 @@ export default function CourseAccordionBar({ course, isActive, handleActive }) {
   const [active, setActive] = useState(false)
   useEffect(() => {
     setActive(isActive?.includes(course._id))
+    // Driven by the parent's open-accordion list; course._id is fixed for this
+    // instance, so it does not need to re-run when it is "re-read".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive])
   const [sectionHeight, setSectionHeight] = useState(0)
   useEffect(() => {
-    setSectionHeight(active ? contentEl.current.scrollHeight : 0)
+    // Guard the ref: it is null if this ever runs before the content div is
+    // attached, and reading scrollHeight off null throws.
+    setSectionHeight(active ? contentEl.current?.scrollHeight ?? 0 : 0)
   }, [active])
 
   return (

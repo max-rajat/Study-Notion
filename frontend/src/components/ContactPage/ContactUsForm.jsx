@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
+import { toast } from "react-hot-toast"
 
 import CountryCode from "../../data/countrycode.json"
 import { apiConnector } from "../../services/apiconnector"
@@ -23,10 +24,20 @@ const ContactUsForm = () => {
         contactusEndpoint.CONTACT_US_API,
         data
       )
-      // console.log("Email Res - ", res)
+      // The endpoint answers 200 with success:false when the mail fails, so the
+      // flag has to be checked rather than relying on the HTTP status.
+      if (!res?.data?.success) {
+        throw new Error(res?.data?.message || "Message could not be sent")
+      }
+      toast.success("Message sent successfully")
       setLoading(false)
     } catch (error) {
       console.log("ERROR MESSAGE - ", error.message)
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Message could not be sent"
+      )
       setLoading(false)
     }
   }

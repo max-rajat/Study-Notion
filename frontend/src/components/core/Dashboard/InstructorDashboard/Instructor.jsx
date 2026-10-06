@@ -24,6 +24,8 @@ export default function Instructor() {
         }
         setLoading(false)
       })()
+      // Load the dashboard once on mount.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   
     const totalAmount = instructorData?.reduce(

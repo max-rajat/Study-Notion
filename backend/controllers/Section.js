@@ -1,6 +1,24 @@
 const Section = require("../models/Section");
 const Course = require("../models/Course");
 const SubSection = require("../models/SubSection");
+
+// Every section route is mounted behind `isInstructor`, which only proves the
+// caller is *an* instructor — not that they own this course. Without this check
+// any instructor could restructure someone else's course.
+const assertOwnsCourse = async (courseId, userId) => {
+	const course = await Course.findById(courseId);
+	if (!course) {
+		return { ok: false, status: 404, message: "Course not found" };
+	}
+	if (course.instructor.toString() !== userId) {
+		return {
+			ok: false,
+			status: 403,
+			message: "You are not the instructor of this course",
+		};
+	}
+	return { ok: true, course };
+};
 // CREATE a new section
 exports.createSection = async (req, res) => {
 	try {
@@ -13,6 +31,13 @@ exports.createSection = async (req, res) => {
 				success: false,
 				message: "Missing required properties",
 			});
+		}
+
+		const ownership = await assertOwnsCourse(courseId, req.user.id);
+		if (!ownership.ok) {
+			return res
+				.status(ownership.status)
+				.json({ success: false, message: ownership.message });
 		}
 
 		// Create a new section with the given name
@@ -56,6 +81,33 @@ exports.createSection = async (req, res) => {
 exports.updateSection = async (req, res) => {
 	try {
 		const { sectionName, sectionId,courseId } = req.body;
+
+		if (!sectionId || !courseId) {
+			return res.status(400).json({
+				success: false,
+				message: "sectionId and courseId are required",
+			});
+		}
+
+		const ownership = await assertOwnsCourse(courseId, req.user.id);
+		if (!ownership.ok) {
+			return res
+				.status(ownership.status)
+				.json({ success: false, message: ownership.message });
+		}
+
+		// The section must actually belong to this course.
+		if (
+			!ownership.course.courseContent.some(
+				(id) => id.toString() === sectionId
+			)
+		) {
+			return res.status(404).json({
+				success: false,
+				message: "Section does not belong to this course",
+			});
+		}
+
 		const section = await Section.findByIdAndUpdate(
 			sectionId,
 			{ sectionName },
@@ -90,19 +142,36 @@ exports.deleteSection = async (req, res) => {
 	try {
 
 		const { sectionId, courseId }  = req.body;
-		await Course.findByIdAndUpdate(courseId, {
-			$pull: {
-				courseContent: sectionId,
-			}
-		})
+
+		if (!sectionId || !courseId) {
+			return res.status(400).json({
+				success: false,
+				message: "sectionId and courseId are required",
+			});
+		}
+
+		const ownership = await assertOwnsCourse(courseId, req.user.id);
+		if (!ownership.ok) {
+			return res
+				.status(ownership.status)
+				.json({ success: false, message: ownership.message });
+		}
+
+		// --- Original pulled the section off the course *before* checking that
+		//     the section existed, so a bad id still mutated the course. ---
 		const section = await Section.findById(sectionId);
-		console.log(sectionId, courseId);
 		if(!section) {
 			return res.status(404).json({
 				success:false,
 				message:"Section not Found",
 			})
 		}
+
+		await Course.findByIdAndUpdate(courseId, {
+			$pull: {
+				courseContent: sectionId,
+			}
+		})
 
 		//delete sub section
 		await SubSection.deleteMany({_id: {$in: section.subSection}});

@@ -43,6 +43,9 @@ export default function SubSectionModal({
       setValue("lectureDesc", modalData.description)
       setValue("lectureVideo", modalData.videoUrl)
     }
+    // Seed the form once when the modal opens; re-running this would overwrite
+    // whatever the user has typed since.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // detect whether form is updated or not

@@ -21,6 +21,8 @@ export default function PublishCourse() {
     if (course?.status === COURSE_STATUS.PUBLISHED) {
       setValue("public", true)
     }
+    // Set the initial checkbox state once; re-running would fight the user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const goBack = () => {

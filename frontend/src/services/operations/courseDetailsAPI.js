@@ -57,8 +57,12 @@ export const fetchCourseDetails = async (courseId) => {
     result = response.data
   } catch (error) {
     console.log("COURSE_DETAILS_API API ERROR............", error)
-    result = error.response.data
-    // toast.error(error.response.data.message);
+    // --- Original read error.response.data, which threw inside the catch when
+    //     the request never reached the server. ---
+    result = error?.response?.data || {
+      success: false,
+      message: error?.message || "Could not fetch course details",
+    }
   }
   toast.dismiss(toastId)
   //   dispatch(setLoading(false));
@@ -328,8 +332,12 @@ export const getFullDetailsOfCourse = async (courseId, token) => {
     result = response?.data?.data
   } catch (error) {
     console.log("COURSE_FULL_DETAILS_API API ERROR............", error)
-    result = error.response.data
-    // toast.error(error.response.data.message);
+    // --- Original read error.response.data, which threw inside the catch when
+    //     the request never reached the server. ---
+    result = error?.response?.data || {
+      success: false,
+      message: error?.message || "Could not fetch course details",
+    }
   }
   toast.dismiss(toastId)
   //   dispatch(setLoading(false));

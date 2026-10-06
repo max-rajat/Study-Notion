@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
+import { toast } from "react-hot-toast"
 import { useDispatch, useSelector } from "react-redux"
-import { Outlet, useParams } from "react-router-dom"
+import { Outlet, useNavigate, useParams } from "react-router-dom"
 
 import CourseReviewModal from "../components/core/ViewCourse/CourseReviewModal"
 import VideoDetailsSidebar from "../components/core/ViewCourse/VideoDetailsSidebar"
@@ -16,18 +17,26 @@ export default function ViewCourse() {
   const { courseId } = useParams()
   const { token } = useSelector((state) => state.auth)
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const [reviewModal, setReviewModal] = useState(false)
 
   useEffect(() => {
     ;(async () => {
       const courseData = await getFullDetailsOfCourse(courseId, token)
-      // console.log("Course Data here... ", courseData.courseDetails)
+      // --- Original went straight to courseData.courseDetails.courseContent,
+      //     which threw whenever the request failed (not enrolled, course
+      //     deleted, network down) and left the page blank. ---
+      if (!courseData?.courseDetails) {
+        toast.error(courseData?.message || "Could not load this course")
+        navigate("/dashboard/enrolled-courses")
+        return
+      }
       dispatch(setCourseSectionData(courseData.courseDetails.courseContent))
       dispatch(setEntireCourseData(courseData.courseDetails))
-      dispatch(setCompletedLectures(courseData.completedVideos))
+      dispatch(setCompletedLectures(courseData.completedVideos || []))
       let lectures = 0
-      courseData?.courseDetails?.courseContent?.forEach((sec) => {
-        lectures += sec.subSection.length
+      courseData.courseDetails.courseContent?.forEach((sec) => {
+        lectures += sec.subSection?.length || 0
       })
       dispatch(setTotalNoOfLectures(lectures))
     })()

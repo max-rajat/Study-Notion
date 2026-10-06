@@ -3,14 +3,22 @@ const mailSender = require("../utils/mailSender")
 
 exports.contactUsController = async (req, res) => {
   const { email, firstname, lastname, message, phoneNo, countrycode } = req.body
-  console.log(req.body)
+
+  if (!email || !firstname || !message) {
+    return res.status(400).json({
+      success: false,
+      message: "Name, email and message are required",
+    })
+  }
+
+  // --- Original logged the entire request body (the sender's email, phone
+  //     number and message) on every submission. ---
   try {
-    const emailRes = await mailSender(
+    await mailSender(
       email,
       "Your Data send successfully",
       contactUsEmail(email, firstname, lastname, message, phoneNo, countrycode)
     )
-    console.log("Email Res ", emailRes)
     return res.json({
       success: true,
       message: "Email send successfully",
