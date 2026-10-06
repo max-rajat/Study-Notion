@@ -13,7 +13,7 @@ const nodemailer = require("nodemailer");
 // Keeping both means local development can carry on using Gmail SMTP unchanged
 // while the deployed instance goes over HTTP.
 
-const TIMEOUT_MS = Number(process.env.MAIL_TIMEOUT_MS) || 10000;
+const TIMEOUT_MS = Number(process.env.MAIL_TIMEOUT_MS) || 16000;
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 const usingResend = () => Boolean(process.env.RESEND_API_KEY);
@@ -86,25 +86,43 @@ const sendViaResend = async (email, title, body) => {
 
 // ------------------------------------------------------------------ SMTP
 
-const buildTransport = () =>
+// Which ports to attempt, in order. A host may block one submission port and
+// leave another open, so when MAIL_PORT is not pinned we try both of Gmail's:
+// 465 (implicit TLS) first, then 587 (STARTTLS).
+const candidatePorts = () => {
+	const pinned = Number(process.env.MAIL_PORT);
+	const defaults = [465, 587];
+	// A pinned MAIL_PORT is tried first, but the alternate is still attempted
+	// afterwards — otherwise pinning a port that the host happens to block
+	// would disable the fallback entirely.
+	return pinned
+		? [pinned, ...defaults.filter((p) => p !== pinned)]
+		: defaults;
+};
+
+// Per-attempt budget, so trying two ports can't exceed the overall timeout.
+const perAttemptTimeout = () =>
+	Math.max(4000, Math.floor(TIMEOUT_MS / candidatePorts().length));
+
+const buildTransport = (port) =>
 	nodemailer.createTransport({
 		host: process.env.MAIL_HOST,
-		port: Number(process.env.MAIL_PORT) || 587,
+		port,
 		// Port 465 is implicit TLS; everything else upgrades via STARTTLS.
-		secure: Number(process.env.MAIL_PORT) === 465,
+		secure: port === 465,
 		auth: {
 			user: process.env.MAIL_USER,
 			pass: process.env.MAIL_PASS,
 		},
 		// Without these, nodemailer waits ~2 minutes before giving up.
-		connectionTimeout: TIMEOUT_MS,
-		greetingTimeout: TIMEOUT_MS,
-		socketTimeout: TIMEOUT_MS,
+		connectionTimeout: perAttemptTimeout(),
+		greetingTimeout: perAttemptTimeout(),
+		socketTimeout: perAttemptTimeout(),
 	});
 
-const describeSmtpFailure = (error) => {
+const describeSmtpFailure = (error, portsTried) => {
 	const host = process.env.MAIL_HOST;
-	const port = Number(process.env.MAIL_PORT) || 587;
+	const port = (portsTried || candidatePorts()).join("/");
 
 	if (!host || !process.env.MAIL_USER || !process.env.MAIL_PASS) {
 		return "Mail is not configured: set RESEND_API_KEY, or all of MAIL_HOST, MAIL_USER and MAIL_PASS.";
@@ -123,23 +141,46 @@ const describeSmtpFailure = (error) => {
 	return `Sending mail via ${host}:${port} failed: ${error.message}`;
 };
 
+// Connection-level failures are worth retrying on another port; an auth
+// rejection or a bad recipient is not, so stop immediately on those.
+const isPortBlocked = (error) =>
+	["ETIMEDOUT", "ESOCKET", "ECONNECTION", "ECONNREFUSED", "EHOSTUNREACH"].includes(
+		error.code
+	);
+
 const sendViaSmtp = async (email, title, body) => {
-	try {
-		// A display name on its own is not a valid From header — it needs an
-		// address, which is the authenticated mailbox.
-		return await buildTransport().sendMail({
-			from: process.env.MAIL_FROM || `"StudyNotion" <${process.env.MAIL_USER}>`,
-			to: email,
-			subject: title,
-			html: body,
-		});
-	} catch (error) {
-		const explanation = describeSmtpFailure(error);
-		const wrapped = new Error(explanation);
-		wrapped.code = error.code;
-		wrapped.cause = error;
-		throw wrapped;
+	const ports = candidatePorts();
+	let lastError;
+
+	for (const port of ports) {
+		try {
+			// A display name on its own is not a valid From header — it needs an
+			// address, which is the authenticated mailbox.
+			const info = await buildTransport(port).sendMail({
+				from:
+					process.env.MAIL_FROM || `"StudyNotion" <${process.env.MAIL_USER}>`,
+				to: email,
+				subject: title,
+				html: body,
+			});
+			if (ports.length > 1) {
+				console.log(`[mailSender] sent over SMTP port ${port}`);
+			}
+			return info;
+		} catch (error) {
+			lastError = error;
+			if (!isPortBlocked(error)) break;
+			console.log(
+				`[mailSender] port ${port} unreachable (${error.code}); trying next`
+			);
+		}
 	}
+
+	const explanation = describeSmtpFailure(lastError, ports);
+	const wrapped = new Error(explanation);
+	wrapped.code = lastError.code;
+	wrapped.cause = lastError;
+	throw wrapped;
 };
 
 // ------------------------------------------------------------------ public API
