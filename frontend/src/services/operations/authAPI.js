@@ -31,16 +31,7 @@ export function sendOtp(email, navigate) {
         throw new Error(response.data.message)
       }
 
-      // In demo mode the server could not email the code, so it returns it
-      // directly. Show it long enough to be copied rather than sending the
-      // user to an inbox that will never receive anything.
-      if (response.data.demoMode && response.data.otp) {
-        toast.success(`Demo mode — your code is ${response.data.otp}`, {
-          duration: 15000,
-        })
-      } else {
-        toast.success("OTP Sent Successfully")
-      }
+      toast.success("OTP Sent Successfully")
       navigate("/verify-email")
     } catch (error) {
       console.log("SENDOTP API ERROR............", error)
