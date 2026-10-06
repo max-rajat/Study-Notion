@@ -1,6 +1,6 @@
 # StudyNotion Online Education Platform (MERN App)
 
-### 🔗 [Live Demo](https://frontend-tau-red-22.vercel.app)
+### 🔗 [Live Demo](https://study-notion-one-sigma.vercel.app)
 
 Full-stack deployment — React frontend on Vercel, Node/Express API and MongoDB on Render.
 
