@@ -1,4 +1,8 @@
-# StudyNotion Online Education Platform (MERN App) [Website Link](https://study-notion-one-sigma.vercel.app/)
+# StudyNotion Online Education Platform (MERN App)
+
+<!-- The previous link (study-notion-one-sigma.vercel.app) now returns 404.
+     Replace the line below with the current Vercel URL once redeployed. -->
+_Live demo: not currently deployed._
 
 ![Main Page](images/mainpage.png)
 
