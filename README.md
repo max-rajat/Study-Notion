@@ -1,8 +1,8 @@
 # StudyNotion Online Education Platform (MERN App)
 
-<!-- The previous link (study-notion-one-sigma.vercel.app) now returns 404.
-     Replace the line below with the current Vercel URL once redeployed. -->
-_Live demo: not currently deployed._
+### 🔗 [Live Demo](https://frontend-tau-red-22.vercel.app)
+
+Full-stack deployment — React frontend on Vercel, Node/Express API and MongoDB on Render.
 
 ![Main Page](images/mainpage.png)
 

@@ -75,3 +75,6 @@ coverage/
 *.log
 *.tmp
 *.temp
+
+# Vercel CLI project link
+.vercel
