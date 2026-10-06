@@ -43,11 +43,30 @@ async function sendVerificationEmail(email, otp) {
 	}
 }
 
-// Define a post-save hook to send email after the document has been saved
+// DEMO_MODE lets the app run where no email provider is reachable — notably
+// hosts that block outbound SMTP (Render, Fly, Heroku) when no HTTP email API
+// key is configured. The OTP document is still created, so the normal
+// verify-then-signup flow is unchanged; only delivery is skipped, and the
+// controller hands the code back in the response instead.
+//
+// This is a demo convenience, NOT a production setting: it means anyone can
+// register with an address they do not own, because the code is no longer a
+// proof of mailbox access. Leave it unset for a real deployment and configure
+// RESEND_API_KEY instead.
+const demoMode = () => String(process.env.DEMO_MODE).toLowerCase() === "true";
+
 OTPSchema.pre("save", async function (next) {
 	// Only send an email when a new document is created
 	if (this.isNew) {
-		await sendVerificationEmail(this.email, this.otp);
+		try {
+			await sendVerificationEmail(this.email, this.otp);
+		} catch (error) {
+			if (!demoMode()) throw error;
+			console.warn(
+				`[OTP] DEMO_MODE: email delivery failed (${error.message}) — ` +
+					`returning the OTP in the API response instead.`
+			);
+		}
 	}
 	next();
 });

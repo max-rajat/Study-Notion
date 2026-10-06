@@ -247,6 +247,18 @@ exports.sendotp = async (req, res) => {
     //   message: `OTP Sent Successfully`,
     //   otp,
     // })
+    // In DEMO_MODE the OTP could not be emailed, so hand it back to the caller
+    // to keep signup usable. Clearly flagged so the UI can explain itself.
+    // Never enabled unless DEMO_MODE=true is set explicitly.
+    if (String(process.env.DEMO_MODE).toLowerCase() === "true") {
+      return res.status(200).json({
+        success: true,
+        demoMode: true,
+        otp: otpBody.otp,
+        message: `Demo mode: email delivery is unavailable, so your code is ${otpBody.otp}`,
+      })
+    }
+
     res.status(200).json({
       success: true,
       message: `OTP Sent Successfully`,
