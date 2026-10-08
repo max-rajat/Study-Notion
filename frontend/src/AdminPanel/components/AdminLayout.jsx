@@ -8,15 +8,15 @@ export default function AdminLayout() {
   const { adminUser: user } = useSelector((state) => state.adminAuth)
 
   return (
-    <div className="flex min-h-screen w-full bg-richblack-900">
+    <div className="flex min-h-screen w-full flex-col bg-richblack-900 md:flex-row">
       <AdminSidebar />
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-richblack-700 bg-richblack-800 px-8 py-4">
-          <h1 className="text-lg font-semibold text-richblack-5">
+        <header className="flex items-center justify-between border-b border-richblack-700 bg-richblack-800 px-4 py-4 md:px-8">
+          <h1 className="text-base font-semibold text-richblack-5 md:text-lg">
             Admin Dashboard
           </h1>
           <div className="flex items-center gap-x-3">
-            <span className="text-sm text-richblack-100">
+            <span className="hidden text-sm text-richblack-100 sm:inline">
               {user?.firstName} {user?.lastName}
             </span>
             {user?.image && (

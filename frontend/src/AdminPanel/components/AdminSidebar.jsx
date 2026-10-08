@@ -1,3 +1,5 @@
+import { useState } from "react"
+import { AiOutlineClose, AiOutlineMenu } from "react-icons/ai"
 import { VscAccount, VscFiles, VscListUnordered, VscSignOut } from "react-icons/vsc"
 import { useDispatch } from "react-redux"
 import { NavLink, useNavigate } from "react-router-dom"
@@ -13,9 +15,10 @@ const adminLinks = [
 export default function AdminSidebar() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-  return (
-    <div className="flex min-w-[220px] flex-col justify-between border-r border-richblack-700 bg-richblack-800 py-8">
+  const linksAndLogout = (
+    <>
       <div className="flex flex-col">
         <p className="mb-8 px-6 text-xl font-bold text-yellow-50">Admin</p>
         {adminLinks.map((link) => {
@@ -50,6 +53,50 @@ export default function AdminSidebar() {
           <span>Logout</span>
         </div>
       </button>
-    </div>
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <div className="flex items-center justify-between border-b border-richblack-700 bg-richblack-800 px-4 py-3 md:hidden">
+        <p className="text-lg font-bold text-yellow-50">Admin</p>
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open admin menu"
+          className="text-richblack-25"
+        >
+          <AiOutlineMenu className="text-xl" />
+        </button>
+      </div>
+
+      {/* Desktop sidebar */}
+      <div className="hidden min-w-[220px] flex-col justify-between border-r border-richblack-700 bg-richblack-800 py-8 md:flex">
+        {linksAndLogout}
+      </div>
+
+      {/* Mobile off-canvas drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[1200] md:hidden">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div
+            className="relative flex h-full w-64 max-w-[80%] flex-col justify-between bg-richblack-800 py-8"
+            onClick={() => setMobileOpen(false)}
+          >
+            <button
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close admin menu"
+              className="absolute right-4 top-4 text-richblack-100"
+            >
+              <AiOutlineClose className="text-xl" />
+            </button>
+            {linksAndLogout}
+          </div>
+        </div>
+      )}
+    </>
   )
 }

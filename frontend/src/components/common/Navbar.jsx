@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react"
-import { AiOutlineMenu, AiOutlineShoppingCart } from "react-icons/ai"
+import { useEffect, useRef, useState } from "react"
+import { AiOutlineClose, AiOutlineMenu, AiOutlineShoppingCart } from "react-icons/ai"
 import { BsChevronDown, BsSun, BsMoonStars } from "react-icons/bs"
-import { useSelector } from "react-redux"
-import { Link, matchPath, useLocation } from "react-router-dom"
+import { VscSignOut } from "react-icons/vsc"
+import { useDispatch, useSelector } from "react-redux"
+import { Link, matchPath, useLocation, useNavigate } from "react-router-dom"
 
 import logoLight from "../../assets/Logo/Logo-Full-Light.png"
 import logoDark from "../../assets/Logo/Logo-Full-Dark.png"
 import { NavbarLinks } from "../../data/navbar-links"
+import useOnClickOutside from "../../hooks/useOnClickOutside"
 import { apiConnector } from "../../services/apiconnector"
+import { logout } from "../../services/operations/authAPI"
 import { categories } from "../../services/apis"
 import { ACCOUNT_TYPE } from "../../utils/constants"
 import { useTheme } from "../../context/ThemeContext"
@@ -19,11 +22,24 @@ function Navbar() {
   const { totalItems } = useSelector((state) => state.cart)
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
   const isLight = theme === "light"
   const isHome = location.pathname === "/"
 
   const [subLinks, setSubLinks] = useState([])
   const [loading, setLoading] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mobileCatalogOpen, setMobileCatalogOpen] = useState(false)
+  const mobileMenuRef = useRef(null)
+
+  useOnClickOutside(mobileMenuRef, () => setMobileMenuOpen(false))
+
+  // Close the mobile menu whenever the route changes.
+  useEffect(() => {
+    setMobileMenuOpen(false)
+    setMobileCatalogOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     ;(async () => {
@@ -46,7 +62,7 @@ function Navbar() {
 
   return (
     <div
-      className={`flex h-14 items-center justify-center border-b-[1px] ${
+      className={`relative flex h-14 items-center justify-center border-b-[1px] ${
         isLight ? "border-b-pure-greys-25" : "border-b-richblack-700"
       } ${
         isHome
@@ -175,11 +191,146 @@ function Navbar() {
           )}
           {token !== null && <ProfileDropdown />}
         </div>
-          <button className="md:hidden">
-            <AiOutlineMenu fontSize={24} fill={isLight ? "#424854" : "#AFB2BF"} />
+          <button
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+            className="grid h-9 w-9 place-items-center rounded-full text-richblack-100 transition-colors hover:bg-richblack-700 md:hidden"
+          >
+            {mobileMenuOpen ? (
+              <AiOutlineClose fontSize={24} fill={isLight ? "#424854" : "#AFB2BF"} />
+            ) : (
+              <AiOutlineMenu fontSize={24} fill={isLight ? "#424854" : "#AFB2BF"} />
+            )}
           </button>
         </div>
       </div>
+
+      {/* Mobile menu panel */}
+      {mobileMenuOpen && (
+        <div
+          ref={mobileMenuRef}
+          className={`absolute left-0 top-14 z-[1100] w-full border-b-[1px] md:hidden ${
+            isLight
+              ? "border-b-pure-greys-25 bg-white"
+              : "border-b-richblack-700 bg-richblack-800"
+          }`}
+        >
+          <div className="mx-auto flex w-11/12 max-w-maxContent flex-col gap-y-2 py-4">
+            {NavbarLinks.map((link, index) =>
+              link.title === "Catalog" ? (
+                <div key={index}>
+                  <button
+                    onClick={() => setMobileCatalogOpen((prev) => !prev)}
+                    className={`flex w-full items-center justify-between py-2 ${
+                      matchRoute("/catalog/:catalogName")
+                        ? "text-yellow-25"
+                        : "text-richblack-25"
+                    }`}
+                  >
+                    <span>Catalog</span>
+                    <BsChevronDown
+                      className={`transition-transform duration-150 ${
+                        mobileCatalogOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {mobileCatalogOpen && (
+                    <div className="flex flex-col gap-y-1 border-l border-richblack-700 pl-4">
+                      {loading ? (
+                        <p className="py-2 text-richblack-300">Loading...</p>
+                      ) : subLinks?.filter(
+                          (subLink) => subLink?.courses?.length > 0
+                        )?.length ? (
+                        subLinks
+                          ?.filter((subLink) => subLink?.courses?.length > 0)
+                          ?.map((subLink, i) => (
+                            <Link
+                              to={`/catalog/${subLink.name
+                                .split(" ")
+                                .join("-")
+                                .toLowerCase()}`}
+                              className="py-2 text-richblack-300"
+                              key={i}
+                            >
+                              {subLink.name}
+                            </Link>
+                          ))
+                      ) : (
+                        <p className="py-2 text-richblack-300">
+                          No Courses Found
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link key={index} to={link?.path} className="py-2">
+                  <p
+                    className={`${
+                      matchRoute(link?.path)
+                        ? "text-yellow-25"
+                        : "text-richblack-25"
+                    }`}
+                  >
+                    {link.title}
+                  </p>
+                </Link>
+              )
+            )}
+
+            <div
+              className={`my-2 h-[1px] w-full ${
+                isLight ? "bg-pure-greys-25" : "bg-richblack-700"
+              }`}
+            />
+
+            {user && user?.accountType !== ACCOUNT_TYPE.INSTRUCTOR && (
+              <Link to="/dashboard/cart" className="flex items-center gap-x-2 py-2 text-richblack-25">
+                <span className="relative">
+                  <AiOutlineShoppingCart className="text-xl" />
+                  {totalItems > 0 && (
+                    <span className="absolute -bottom-2 -right-2 grid h-5 w-5 place-items-center overflow-hidden rounded-full bg-richblack-600 text-center text-xs font-bold text-yellow-100">
+                      {totalItems}
+                    </span>
+                  )}
+                </span>
+                Cart
+              </Link>
+            )}
+
+            {token !== null && (
+              <>
+                <Link to="/dashboard/my-profile" className="py-2 text-richblack-25">
+                  Dashboard
+                </Link>
+                <button
+                  onClick={() => dispatch(logout(navigate))}
+                  className="flex items-center gap-x-2 py-2 text-left text-richblack-25"
+                >
+                  <VscSignOut className="text-lg" />
+                  Logout
+                </button>
+              </>
+            )}
+
+            {token === null && (
+              <div className="flex items-center gap-x-4 py-2">
+                <Link to="/login" className="w-1/2">
+                  <button className="w-full rounded-[8px] border border-richblack-700 bg-richblack-800 px-[12px] py-[8px] text-richblack-100">
+                    Log in
+                  </button>
+                </Link>
+                <Link to="/signup" className="w-1/2">
+                  <button className="w-full rounded-[8px] border border-richblack-700 bg-richblack-800 px-[12px] py-[8px] text-richblack-100">
+                    Sign up
+                  </button>
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

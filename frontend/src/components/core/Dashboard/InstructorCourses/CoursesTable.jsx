@@ -41,7 +41,7 @@ export default function CoursesTable({ courses, setCourses }) {
     <>
       <Table className="rounded-xl border border-richblack-800 ">
         <Thead>
-          <Tr className="flex gap-x-10 rounded-t-md border-b border-b-richblack-800 px-6 py-2">
+          <Tr className="hidden gap-x-10 rounded-t-md border-b border-b-richblack-800 px-6 py-2 sm:flex">
             <Th className="flex-1 text-left text-sm font-medium uppercase text-richblack-100">
               Courses
             </Th>
@@ -68,19 +68,19 @@ export default function CoursesTable({ courses, setCourses }) {
             courses?.map((course) => (
               <Tr
                 key={course._id}
-                className="flex gap-x-10 border-b border-richblack-800 px-6 py-8"
+                className="flex flex-col gap-4 border-b border-richblack-800 px-4 py-6 sm:flex-row sm:gap-x-10 sm:px-6 sm:py-8"
               >
                 <Td className="flex flex-1 gap-x-4">
                   <img
                     src={course?.thumbnail}
                     alt={course?.courseName}
-                    className="h-[148px] w-[220px] rounded-lg object-cover"
+                    className="h-[90px] w-[130px] shrink-0 rounded-lg object-cover sm:h-[148px] sm:w-[220px]"
                   />
                   <div className="flex flex-col justify-between">
-                    <p className="text-lg font-semibold text-richblack-5">
+                    <p className="text-sm font-semibold text-richblack-5 sm:text-lg">
                       {course.courseName}
                     </p>
-                    <p className="text-xs text-richblack-300">
+                    <p className="hidden text-xs text-richblack-300 sm:block">
                       {course.courseDescription.split(" ").length >
                       TRUNCATE_LENGTH
                         ? course.courseDescription
@@ -107,10 +107,16 @@ export default function CoursesTable({ courses, setCourses }) {
                     )}
                   </div>
                 </Td>
-                <Td className="text-sm font-medium text-richblack-100">
+                <Td className="flex items-center gap-x-2 text-sm font-medium text-richblack-100 sm:block">
+                  <span className="text-xs uppercase text-richblack-500 sm:hidden">
+                    Duration:
+                  </span>
                   2hr 30min
                 </Td>
-                <Td className="text-sm font-medium text-richblack-100">
+                <Td className="flex items-center gap-x-2 text-sm font-medium text-richblack-100 sm:block">
+                  <span className="text-xs uppercase text-richblack-500 sm:hidden">
+                    Price:
+                  </span>
                   ₹{course.price}
                 </Td>
                 <Td className="text-sm font-medium text-richblack-100 ">
